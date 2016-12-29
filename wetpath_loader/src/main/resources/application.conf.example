@@ -1,0 +1,10 @@
+#
+# Copy this to application.conf and fill in the values for the database connection.
+#
+dbconnection {
+    driver="com.mysql.jdbc.Driver"
+    url="jdbc:mysql://mydbhost/mydb"
+    username="XXXXXXXXXXXXXXX"
+    password="XXXXXXXXXXXXXXXX"
+}
+
