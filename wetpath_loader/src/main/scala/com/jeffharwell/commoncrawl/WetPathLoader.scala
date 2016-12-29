@@ -39,7 +39,7 @@ class WetPathLoader(driver: String, url: String, username: String, password: Str
     }
 
     // Catch any stragglers
-    if ( counter % batchsize == 0) {
+    if ( counter % batchsize != 0) {
       ps.executeBatch()
     }
 
