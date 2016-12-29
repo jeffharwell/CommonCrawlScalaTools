@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl
+package com.jeffharwell.commoncrawl.wetpathloader
 
 import java.io.File
 import java.sql.DriverManager

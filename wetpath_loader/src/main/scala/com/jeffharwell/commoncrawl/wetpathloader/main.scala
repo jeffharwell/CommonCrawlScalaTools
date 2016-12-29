@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl
+package com.jeffharwell.commoncrawl.wetpathloader
 
 import com.typesafe.config.ConfigFactory
 import scala.io.BufferedSource
