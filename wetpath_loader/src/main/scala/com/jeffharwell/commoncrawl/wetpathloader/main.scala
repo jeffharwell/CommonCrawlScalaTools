@@ -11,10 +11,11 @@ object Main extends App {
   val url = conf.getString("dbconnection.url")
   val username = conf.getString("dbconnection.username")
   val password = conf.getString("dbconnection.password")
+  val wetpathfile = conf.getString("general.wetpathfile")
 
   val loader = new WetPathLoader(driver, url, username, password)
 
-  val inputSource = getBufferedSource("wet.paths.201612")
+  val inputSource = getBufferedSource(wetpathfile)
 
   val wpl = new WetPathLoader(driver, url, username, password)
   wpl.loadPaths(inputSource)

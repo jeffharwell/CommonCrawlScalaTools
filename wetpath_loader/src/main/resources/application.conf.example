@@ -6,3 +6,10 @@ dbconnection {
     password="xxxxxxxxxxxx"
 }
 
+general {
+    ## This can be the name of a file in the resources directory OR
+    ## the full path to another file on the filesystem. The code checks
+    ## the resource directory first
+    wetpathfile="wet.paths.201612"
+}
+

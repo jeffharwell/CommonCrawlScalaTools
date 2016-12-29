@@ -9,3 +9,5 @@ create table wetpaths (
     processed int,
     primary key (id)
 ) engine innodb;
+
+grant select,insert,update,delete on wetpaths to 'commoncrawl'@'%';
