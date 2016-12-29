@@ -1,10 +1,8 @@
-#
-# Copy this to application.conf and fill in the values for the database connection.
-#
+# these are our own config values defined by the app
 dbconnection {
-    driver="com.mysql.jdbc.Driver"
-    url="jdbc:mysql://mydbhost/mydb"
-    username="XXXXXXXXXXXXXXX"
-    password="XXXXXXXXXXXXXXXX"
+    driver="com.mysql.cj.jdbc.Driver"
+    url="jdbc:mysql://myhostname/mydbname"
+    username="xxxxxxxxxxxxx"
+    password="xxxxxxxxxxxx"
 }
 
