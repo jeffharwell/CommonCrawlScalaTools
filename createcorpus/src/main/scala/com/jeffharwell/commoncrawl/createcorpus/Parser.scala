@@ -126,13 +126,6 @@ class Parser(inputstream: InputStream) extends Iterator[List[String]] {
    * This is the hasNext() implementation for the iterator. The variable hasnext
    * is set to false by the parseBuffer() method when we reach the end of the InputStream
    *
-   * Note that this isn't entirely accurate. Because we are reading an InputStream on the fly
-   * we actually don't know if there is an entire record left or not, we won't know until we 
-   * try next() and actually hit the end of the stream. So. next() may return an empty list
-   * after .hasNext() has indicated that there is actually another record present.
-   *
-   * I suppose we could get around this by reading ahead one record ... hmm
-   *
    * @return boolean indicating if there is another record in the iterator
    */
   def hasNext(): Boolean = {
