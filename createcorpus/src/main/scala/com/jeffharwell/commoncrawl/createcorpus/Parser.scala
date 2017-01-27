@@ -12,20 +12,6 @@ import scala.collection.immutable.List
 
 
 class Parser(inputstream: InputStream) extends Iterator[List[String]] {
-  val linebuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
-  val recordbuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
-  val newlinebyte = "\n".getBytes("UTF-8").last
-  var readbuffersize: Int = 1024
-  var linecount: Int = 0
-  var recordcount: Int = 0
-  var recordlength: Int = 0
-  var contentbytesread: Int = 0
-  var bufferbytesread: Int = 0
-  var printnextline: Boolean = false
-  var wetrecords: ListBuffer[String] = new ListBuffer()
-  var gzcInputStream: GZIPCompatibilityWrapper = new GZIPCompatibilityWrapper(inputstream)
-  var gzInputStream: GZIPInputStream = new GZIPInputStream(gzcInputStream)
-  var hasnext: Boolean = true
 
   /* Here is a wrapper class that wraps an InputStream
    * but always returns > 0 when .available() is called.
@@ -65,18 +51,76 @@ class Parser(inputstream: InputStream) extends Iterator[List[String]] {
   }
 
   /*
+   * Here is the constructor.
+   */
+
+  val linebuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
+  val recordbuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
+  val newlinebyte = "\n".getBytes("UTF-8").last
+  var readbuffersize: Int = 1024
+  var linecount: Int = 0
+  var recordcount: Int = 0
+  var recordlength: Int = 0
+  var contentbytesread: Int = 0
+  var bufferbytesread: Int = 0
+  var printnextline: Boolean = false
+  var wetrecords: ListBuffer[String] = new ListBuffer()
+  var gzcInputStream: GZIPCompatibilityWrapper = new GZIPCompatibilityWrapper(inputstream)
+  var gzInputStream: GZIPInputStream = new GZIPInputStream(gzcInputStream)
+  var hasnext: Boolean = true
+  var nextrecord = List[String]()
+
+  /*
+   * Upon initialization of the object we want to read the first chunk of data from the 
+   * buffer and populate the next result so that if .hasNext() is called we can tell the 
+   * truth. We do this because there is no way to reliably tell if an inputstream is really 
+   * empty without trying to read the next value. Much like Drivesavers, we won't say we can
+   * get the information unless we already have it ;)
+   */
+
+  /*
    * This is the next() implementation for our Iterator
    *
    * @return A list of individual WET records
    */
   def next(): List[String] = {
+    // docs say behaviour when next() is called after hasNext() would
+    // report false is undefined, in our case we will throw a runtime
+    // as I think it likely the code has made a mistake that the programmer
+    // should know about.
+    if (!this.hasNext()) {
+      throw new RuntimeException(".next() called when no records remain in the iterator")
+    }
+
+    // Copy nextrecord into the record we are going to return
+    var recordtoreturn: List[String] = nextrecord;
+
+    // Go ahead and try to get the record we will return if next() is called again
+    nextrecord = privatenext()
+
+    // Return the record we already had
+    return recordtoreturn
+  }
+
+  /*
+   * This command actually calls parseBuffer and extracts the next record
+   *
+   * @return A list of individual WET records
+   */
+  def privatenext(): List[String] = {
+    // parseBuffer will return true when it gets a complete record. It will also set
+    // the hasnext variable to false when it hits the end of the stream
     var result = false
     do {
       result = this.parseBuffer
-    } while (!result)
+    } while (!result && hasnext) // if the input stream ends in the middle of a record
+                                 // we want to catch that (hasnext == false) and break
+                                 // the loop. Otherwise an incomplete record at the end of 
+                                 // a file could cause an infinite loop.
 
-    return this.returnRecord() // will return an empty list if we hit end of stream
+    return this.returnRecord()
   }
+
 
   /*
    * This is the hasNext() implementation for the iterator. The variable hasnext
