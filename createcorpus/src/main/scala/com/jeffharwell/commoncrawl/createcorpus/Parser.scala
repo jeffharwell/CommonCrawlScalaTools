@@ -9,81 +9,479 @@ import java.io.InputStreamReader
 import java.util.zip.GZIPInputStream
 import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.List
+import scala.collection.immutable.Map
 
 
-class Parser(inputstream: InputStream) extends Iterator[List[String]] {
-
-  /* Here is a wrapper class that wraps an InputStream
-   * but always returns > 0 when .available() is called.
-   * This will cause GZIPInputStream to always make another 
-   * call to the InputStream to check for an additional 
-   * concatenated GZIP file in the stream.
-   */
-  class GZIPCompatibilityWrapper(inputstream: InputStream) extends InputStream {
-      val is: InputStream = inputstream
-
-      override def read(): Int = {
-          return(is.read());
-      }
-
-      override def read(b: Array[Byte]): Int = {
-          return(is.read(b));
-      }
-
-      override def read(b: Array[Byte], off: Int, len: Int): Int = {
-          return(is.read(b, off, len));
-      }
-
-      override def close(): Unit = {
-          is.close();
-      }
-
-      override def available(): Int = {
-          // Always say that we have 1 more byte in the
-          // buffer, even when we don't
-          val a: Int = is.available();
-          if (a == 0) {
-              return(1);
-          } else {
-              return(a);
-          }
-      }
-  }
+class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
 
   /*
-   * Here is the constructor.
+   * The Constructor
+   *
+   * Object variables and initialization.
    */
 
-  val linebuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
-  val recordbuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
-  val newlinebyte = "\n".getBytes("UTF-8").last
-  var readbuffersize: Int = 1024
   var linecount: Int = 0
   var recordcount: Int = 0
   var recordlength: Int = 0
-  var contentbytesread: Int = 0
-  var bufferbytesread: Int = 0
-  var printnextline: Boolean = false
-  var wetrecords: ListBuffer[String] = new ListBuffer()
-  var gzcInputStream: GZIPCompatibilityWrapper = new GZIPCompatibilityWrapper(inputstream)
-  var gzInputStream: GZIPInputStream = new GZIPInputStream(gzcInputStream)
+  var currentwarcinfo: WARCInfo = new WARCInfo() // this holds the WARCInfo object that
+                                                 // gives the context for all of the 
+                                                 // conversion records in the file
+  var currentwarcconversion: WARCConversion = new WARCConversion() // this holds the conversion
+                                                                   // record we are working on right now
   var hasnext: Boolean = true
-  var nextrecord = List[String]()
+
+  val statetrace = ListBuffer[State]()
+  var debug = false
+
+  var lasterror = "" // contains the last error, which is hopefully the reason
+                     // we ended up in a given sink state
+
+  // Initialize our reader
+  val reader = new Reader(inputstream)
+
 
   /*
-   * Upon initialization of the object we want to read the first chunk of data from the 
+   * Finite State Automata
+   *
+   * FSA Definitions and Initialization
+   */
+  
+  sealed abstract class Event
+
+  sealed abstract class State {
+    def m: Map[Event, State]
+    // as per https://sourcemaking.com/design_patterns/state
+    // the event call includes a reference to the wrapper 
+    // so that the event can access the context
+    def event(f: Fsa) : State = {
+      // by default no state change on event
+      return this
+    }
+
+    // Used by States that need to read content from the input stream
+    def getContent(w: WARCRecord, f: Fsa): Unit = {
+      // Read the amount of content from the InputStream that is specified in the header
+      // the +2 handles the blank line (\r\n) between the headers and the content
+      val c: String = reader.getStringFromBytes(f.bytestoread+2).trim()
+
+      // Now that we have the content set bytestoread in our context class
+      // to zero, this may help prevent a logic bug from causing us to skip records
+      f.bytestoread = 0
+
+      // Add the content
+      w.addContent(c)
+    }
+
+    // Used by states that need to add a header from the input stream
+    def addHeaderToWARCObject(w: WARCRecord): Unit = {
+      // get a line
+      var rawline = reader.getLine()
+      if (rawline.contains(": ")) {
+        var split = rawline.split(": ") // this is almost certainly a bug waiting to happen
+                                        // probably should use a regex instead but that would
+                                        // cost us some performance
+        if (split.size == 2) {
+          // ok, we have a line that split on the right delimiter into two pieces
+          // might be a header pass it to the WARC object
+          w.addFields(Map[String,String](split(0) -> split(1)))
+        }
+      }
+    }
+
+  }
+
+  // here is the actual FSA
+  // this is considered our "Context Class"
+  // https://sourcemaking.com/design_patterns/state
+  class Fsa {
+    private var state: State = S1
+    var bytestoread: Int = 0
+
+    // This calls event on the current state which runs
+    // the state entry code and returns the next state
+    // We come all the way back here, instead of having the
+    // state call the next state's event() directly so that
+    // we can unit test the transitions
+    def run(): State = {
+      state = state.event(this)
+      return(state)
+    }
+
+    def getState(): String = {
+      // there must be a better way
+      return(state.toString())
+    }
+  }
+ 
+  /*
+   * Events
+   */
+  object E1 extends Event // get WARC Info Header incomplete
+  object E2 extends Event // get WARC Info Header -> get WARC Info Content
+  object E4 extends Event // get WARC Info complete -> get WARC Conversion Header
+  object E5 extends Event // WARC Conversion Header incomplete
+  object E6 extends Event // WARC Conversion Header -> get WARC Info Content
+  object E7 extends Event // WARC Conversion header corruption -> scan for next record to try
+  object E8 extends Event // get WARC Conversion complete -> move to pause state S5
+  object E9 extends Event // start getting the next WARC Conversion from input stream
+  object E10 extends Event // we hit the end of the stream after a complete record
+  object E11 extends Event // for the loop in State 6, the probably not a new record event
+  object EX1 extends Event // corrupt WARC file, initial record is not a WARC Info object
+  object EX3 extends Event // corrupt WARC file, WARC info content ends prematurely
+  object EX5 extends Event // corrput WET archive
+  object EX6 extends Event // corrupt WET archive, unable to find subsequent WARC Conversion to parse
+  object EX8 extends Event // generic error, we failed to create a complete WARCConversion record
+  object ENONE extends Event // it's the non-event ... I'm probably doing something wrong ... :(
+  object ESTOP extends Event // this is a non-event kicked out by states
+                             // that do not generate a state changing event by themselves
+                             // mostly S5 and the sink states
+
+  /*
+   * States
+   */
+
+  // Sink1 is the state we end up in if the WET archive is corrupt. This primarily handles
+  // corruption which prevents us from extracting a complete WARC Info type record. If we cannot 
+  // get the WARCInfo record, and it isn't at the top of the file, then we have to bail out.
+  object Sink1 extends State { 
+    val m = Map[Event, State]()
+
+    override def toString(): String = {
+      return "Sink1"
+    }
+  }
+
+  // Sink2 is where we end up if the WET file is corrupt in some way that we couldn't recover
+  // from before the stream ends. The only scenario I can think of right now is if a WARC 
+  // record had incomplete headers and so we move to state 6 to try to pick up the next record
+  // and hit the end of the stream before we were sucessful.
+  object Sink2 extends State {
+    val m = Map[Event, State]()
+
+    override def toString(): String = {
+      return "Sink2"
+    }
+  }
+
+  // Final is the final state of the FSA when we finish a complete archive and the achive ends 
+  // cleanly with no half-specificied WARC conversion records. This doesn't mean there wasn't 
+  // corruption on the way, but it wasn't corruption we couldn't recover from and successfully 
+  // retrieve records after the point where something went wrong.
+  object Final extends State { // this is the final state of the FSA
+    val m = Map[Event, State]() // empty map
+
+    override def toString(): String = {
+      return "Final"
+    }
+  }
+
+  // We have number of required fields + 4 tries to get a complete set of headers
+  var state1trylimit = currentwarcinfo.numberRequiredFields() + 4
+  var state1tries = 0
+
+  /* State S1
+   * this is the initial state, it parses the headers for the inital WARCInfo object.
+   * It makes number of required fields (including content as a field) + 4 attempts to 
+   * secure a complete set of warcinfo headers before it will transition to an error state
+   * (Sink1). This means that if there are a bunch of blank lines at the top of the WET file
+   * then it will be detected as corrupt and not parsed.
+   */
+  object S1 extends State {
+    lazy val m = Map[Event, State](EX1 -> Sink1, // corrupt archive, not a warc info record
+                                   E1 -> S1, // headers not complete, keep reading
+                                   E2 -> S2) // headers complete, get content
+    override def toString(): String = {
+      return "S1"
+    }
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      if (!currentwarcinfo.headersComplete()) {
+        if (state1tries >= state1trylimit) {
+          // we have hit the limit for the number of tries we have to put together
+          // a complete WARCInfo header set. Proceed to Sink1 with an error
+          lasterror = s"Fatal: S1 -> Sink1: We were unable to get a complete set of warcinfo headers in ${state1tries} tries"
+          state1tries = 0
+          return(m(EX1))
+        }
+        state1tries += 1
+
+        if (reader.isEndOfStream()) {
+          // event EX1
+          // we hit the end of the stream without getting a complete set
+          // of headers, something is corrupt ... probably
+          lasterror = s"S1 -> Sink1: We hit the end of the stream without getting a complete set of WARCInfo headers"
+          state1tries = 0
+          return(m(EX1))
+        }
+
+        // Grab the next line and try to add it is a header
+        addHeaderToWARCObject(currentwarcinfo)
+
+        // event E1, assume we don't have a complete set of headers yet and keep looking
+        return(m(E1))
+      } else {
+        // headers are complete, we should know how many bytes of content to read
+        f.bytestoread = currentwarcinfo.getContentSizeInBytes()
+        // event E2, if the headers complete we transition to S2
+        return(m(E2))
+      }
+    }
+
+
+  }
+
+
+  // This state grabs the content for the initial WARC Info object
+  object S2 extends State {
+    lazy val m = Map[Event, State](E4 -> S3, // we have the content, start looking for conversion
+                                   EX3 -> Sink1) // corrupt archive, content ended prematurely
+    override def toString(): String = {
+      return "S2"
+    }
+
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      // I'm intentionally not going to do the logic checks that should have been caught
+      // in S1. If you jump into the middle of the FSA you need to take care of that yourself.
+      // e.g. currentwarcinfo.headersComplete() is assumed to be true in this state.
+      
+      if (reader.isEndOfStream()) {
+        // event EX1
+        // we hit the end of the stream without being able to get the content
+        // something is corrupt ... probably
+        lasterror = "S2 -> Sink1: We hit the end of stream without getting content for the WARCInfo record"
+        return(m(EX1))
+      }
+
+      // get the content and add it to the currentwarcinfo record
+      getContent(currentwarcinfo, f)
+
+      // WARCInfo should be complete now, if so move to WARCConversion parse state
+      // if not move to error state.
+      currentwarcinfo.isComplete() match {
+        case true => return(m(E4))
+        case false => {
+          lasterror = "S2 -> Sink1: Got content and headers but WARCInfo is still incomplete"
+          return(m(EX3))
+        }
+      }
+    }
+  }
+
+  // We have number of required fields + 4 tries to get a complete set of headers
+  var state3trylimit = currentwarcconversion.numberRequiredFields() + 4
+  var state3tries = 0
+
+  // getting WARC Conversion record headers
+  object S3 extends State {
+    override lazy val m = Map[Event, State](EX5 -> Sink1, // corrupt archive
+                                             E5 -> S3,    // headers not complete, keep reading
+                                             E6 -> S4,    // headers complete, move to get content
+                                             E7 -> S6,    // headers corrupt, scan to find next record
+                                             E10 -> Final) // done with the WET Archive File
+    override def toString(): String = {
+      return "S3"
+    }
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      if (reader.isEndOfStream()) {
+        // Two cases here, we might be coming from S5 and actually be at the end
+        // of the WET archive, in that case we are done, go to Final state
+        if (currentwarcconversion.fields.size == 0) {
+          // done, go to the final state via Event E10
+          state3tries = 0
+          return(m(E10))
+        } else {
+          // event EX1
+          // we hit the end of the stream without getting a complete set
+          // of headers, something is corrupt ... probably
+          lasterror = "S3 -> Sink1: We hit the end of the stream without getting a complete set of WARCConversion headers"
+          state3tries = 0
+          return(m(EX5))
+        }
+      }
+
+      state3tries += 1 // record our try
+      // Grab the next line and try to add it is a header
+      addHeaderToWARCObject(currentwarcconversion)
+
+      if (!currentwarcconversion.headersComplete()) {
+        if (state3tries >= state3trylimit) {
+          // we are out of attempts, WARC record probably corrupt
+          // move to S6 to see if there are any other records in this
+          // stream that we could try to parse
+          state3tries = 0
+          return(m(E7))
+        } else {
+          // keep looking for headers
+          return(m(E5))
+        }
+      } else {
+        // headers are complete, we should know how many bytes of content to read
+        f.bytestoread = currentwarcconversion.getContentSizeInBytes()
+        state3tries = 0 // reset our tries
+        return(m(E6)) // transition to S4 to get the content
+      }
+    }
+  }
+
+  // getting WARC Conversion content
+  object S4 extends State {
+    lazy val m = Map[Event, State](E8 -> S5, // this is our stop state, record is complete
+                                   EX8 -> Sink1) // error, we failed to get a complete record
+    override def toString(): String = {
+      return "S4"
+    }
+
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      // I'm intentionally not going to do the logic checks that should have been caught
+      // in S1. If you jump into the middle of the FSA you need to take care of that yourself.
+      // e.g. currentwarcinfo.headersComplete() is assumed to be true in this state.
+      
+      if (reader.isEndOfStream()) {
+        // event EX8
+        // we hit the end of the stream without being able to get the content
+        // something is corrupt ... probably
+        lasterror = s"S4 -> ${m(EX8).toString()}: End of Stream without getting content for WARCConversion"
+        return(m(EX8))
+      }
+
+      // get the content and add it to the currentwarcinfo record
+      getContent(currentwarcconversion, f)
+
+      // Now add in our WARCInfo record
+      currentwarcconversion.addWARCInfo(currentwarcinfo)
+
+      // WARCConversion record should be complete now, if so move to get the next one
+      // if not move to error state.
+      currentwarcconversion.isComplete() match {
+        case true => return(m(E8))
+        case false => {
+          lasterror = s"S4 -> ${m(EX8).toString()}: got content but WARCConversion still not complete"
+          return(m(EX8))
+        }
+      }
+    }
+  }
+
+  // This state means that we have got a complete WARCConversion record
+  // a call to event moves the FSA to wipe out the current WARCConversion record
+  // and move to S3 to start getting the next WARC Conversion record from the input stream
+  object S5 extends State {
+    lazy val m = Map[Event, State](E9 -> S3) // only one transition allowed, get the new WARCConversion
+                                             // record
+    override def toString(): String = {
+      return "S5"
+    }
+
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      // create a new WARCConversion record
+      currentwarcconversion = new WARCConversion()
+      // Return state S3 which will start adding headers to the new record
+      // that we just created.
+      return(m(E9))
+    }
+  }
+
+  object S6 extends State {
+    lazy val m = Map[Event, State](E9 -> S3, // found one .. maybe, back to S3 to parse
+                                   E11 -> S6, // no new record yet, keep looking
+                                   EX6 -> Sink2) // ran out of stream before finding new record
+    override def toString(): String = {
+      return "S6"
+    }
+
+    override def event(f: Fsa): State = {
+      if (debug) { statetrace += this }
+
+      if (reader.isEndOfStream()) {
+        // we ran out of stream before finding another record goto Sink2
+        lasterror = "S6 -> Sink2: Unable to find any additional WARCConversion records after corruption detected"
+        return(m(EX6))
+      }
+
+      // get a line
+      var rawline = reader.getLine()
+      if (rawline.contains("WARC/1.0")) {
+        // alright, we might have found one, go to state 3 and try to parse it
+        
+        // create a new WARCConversion record
+        currentwarcconversion = new WARCConversion()
+
+        return(m(E9))
+      } else {
+        // nope, keep looking
+        return(m(E11))
+      }
+    }
+  }
+
+
+  // Initialize the FSA
+  var fsa = new Fsa
+
+  /*
+   * Iterator
+   *
+   * Upon initialization of the object we want to read the first record from the InputStream
    * buffer and populate the next result so that if .hasNext() is called we can tell the 
    * truth. We do this because there is no way to reliably tell if an inputstream is really 
    * empty without trying to read the next value. Much like Drivesavers, we won't say we can
    * get the information unless we already have it ;)
+   *
+   * Note that this actually means that in practice we will pull the first TWO WARC records 
+   * from the InputStream as we need the warcinfo type record to provide the context for
+   * the conversion records. The WARCConversion objects we will be returning require some of the
+   * information from the warcinfo record.
    */
+
+  // if all goes well this should set the currentwarccoversion record with a valid
+  // conversion record 
+  privateNext()
+
+  /*
+   * Begin Methods
+   */
+
+  /* Getters and Setters */
+
+  def getLineCount(): Int = {
+    return linecount
+  }
+  def getRecordCount(): Int = {
+    return recordcount
+  }
+
+  /*
+   * Sets debug to true. The primary change is that this causes the FSA to
+   * keep a list of state changes in the statetrace listbuffer so that you can 
+   * see exactly what happened. This is very helpful for troubleshooting improper
+   * transitions to Sink.
+   */
+  def setDebug(): Unit = {
+    debug = true
+  }
+  /*
+   * Clears the debug flag, clears out any record of state transitions and stops tracking them
+   */
+  def clearDebug(): Unit = {
+    statetrace.clear()
+    debug = false
+  }
 
   /*
    * This is the next() implementation for our Iterator
    *
    * @return A list of individual WET records
    */
-  def next(): List[String] = {
+  def next(): WARCRecord = {
     // docs say behaviour when next() is called after hasNext() would
     // report false is undefined, in our case we will throw a runtime
     // as I think it likely the code has made a mistake that the programmer
@@ -93,34 +491,14 @@ class Parser(inputstream: InputStream) extends Iterator[List[String]] {
     }
 
     // Copy nextrecord into the record we are going to return
-    var recordtoreturn: List[String] = nextrecord;
+    var recordtoreturn = currentwarcconversion
 
     // Go ahead and try to get the record we will return if next() is called again
-    nextrecord = privatenext()
+    privateNext()
 
     // Return the record we already had
     return recordtoreturn
   }
-
-  /*
-   * This command actually calls parseBuffer and extracts the next record
-   *
-   * @return A list of individual WET records
-   */
-  def privatenext(): List[String] = {
-    // parseBuffer will return true when it gets a complete record. It will also set
-    // the hasnext variable to false when it hits the end of the stream
-    var result = false
-    do {
-      result = this.parseBuffer
-    } while (!result && hasnext) // if the input stream ends in the middle of a record
-                                 // we want to catch that (hasnext == false) and break
-                                 // the loop. Otherwise an incomplete record at the end of 
-                                 // a file could cause an infinite loop.
-
-    return this.returnRecord()
-  }
-
 
   /*
    * This is the hasNext() implementation for the iterator. The variable hasnext
@@ -131,175 +509,44 @@ class Parser(inputstream: InputStream) extends Iterator[List[String]] {
   def hasNext(): Boolean = {
     return hasnext
   }
-      
 
   /*
-   * This is the method called by the program populating the a read buffer.
-   * The read buffer will contain some small chunk of a WET file, the job of this
-   * class is to take a sequence of those buffers and return a set of distinct records
-   * from the WET file.
+   * This method actually calls parseBuffer and extracts the next record
    *
-   * @return true if we have found a complete record or reach end of stream, false otherwise
+   * @return A list of individual WET records
    */
+  def privateNext(): Unit = {
+    // This is the method that kicks off the FSA. We run the FSA until we either hit a sink
+    // state (at which time we throw an exception ... probably) or find a complete record
+    // that we could return
+    //
+    // Remember that this method sets up the record that will be return when .next() is actually
+    // called. This method is called on initialization of the object to queue up the first record.
+   
+    // recursive routine to run the FSA
 
-  def parseBuffer(): Boolean = {
-    val buffer = new Array[ Byte ]( readbuffersize )
-    var length: Int = 0
+    // this shouldn't return until the instance variable 'currentwarcconversion' is set
+    // with a complete WARC conversion record
+    var state: State = fsa.run()
+    while (state != Sink1 && state != Final && state != S5) {
+      state = fsa.run()
+    }
 
-    length = gzInputStream.read(buffer)
-    if (length == -1) {
-      // We are done
+    // These states mean we are done with the file one way
+    // or another
+    if (state == Sink1 || state == Final) {
       hasnext = false
-      return true
     }
 
-    bufferbytesread = 0
-    // pretty simple
-    // the parseWetPayload and searchForCompleteLine methods will hand 
-    // off between themselves to properly parse the buffer. This method
-    // only needs to make sure to start with the right method
-    if (recordlength != 0) {
-      // we are in the middle of a WET payload section
-      // call parseWetPayload
-      parseWetPayload(buffer, length)
-    } else {
-      // we are still hunting headers, so look for lines by
-      // calling searchForCompleteLine
-      searchForCompleteLine(buffer, length)
+
+    // Need to see our final state and do some cleanup
+    // If we hit Sink1 something went wrong, throw an error, otherwise
+    // we can keep trucking
+    /*
+    state match {
+      case Sink1 => throw new RuntimeException("Corrupt WET Archive .. more info here")
+      case _ => 
     }
-
-    // At this point we are done looking at the buffer, so go back and check
-    // the object data and see if we have any complete records
-    if (wetrecords.size > 0) {
-      // we have at least one complete record
-      return true
-    }
-    // no complete records
-    return false
-  }
-
-  /*
-   * This method returns any complete WET records that we have thus far. If we don't have
-   * anything it will return an empty List
-   *
-   * @return List[String] where each string is a complete WET record
-   */
-  def returnRecord(): List[String] = {
-    // convert our buffer to a list
-    val toreturn: List[String] = wetrecords.toList
-    // clear our record buffer
-    wetrecords.clear
-    // return our list
-    return toreturn
-  }
-
-  /* This method searchs the read buffer sequentially for complete lines of
-   * text, when it finds one it calls checkLine(). If checkLine() sets the 
-   * object variable recordlength then it will call parseWetPayload to 
-   * process the payload.
-   *
-   * @param buffer the byte array to with bytes to process
-   * @param length the number of bytes to read from the buffer
-   */
-  def searchForCompleteLine(buffer: Array[Byte], length: Int): Unit = {
-    var b = buffer(bufferbytesread)
-    bufferbytesread += 1
-    if (b == newlinebyte) {
-      linecount += 1
-      checkLine() // this will set recordlength if the WET Header indicates
-                  // that the next line starts a record (technically:
-                  // line.startsWith("Content-Length: ")
-      linebuffer.clear()
-    } else {
-      linebuffer.append(b)
-    }
-
-    // If we found a WET record to extract then switch to that activity,
-    // otherwise get the next line
-    if (recordlength != 0) {
-      // found one
-      parseWetPayload(buffer, length)
-    } else if (bufferbytesread < length) {
-      // nope .. move to the next line
-      // tail recursion .. wheee
-      searchForCompleteLine(buffer, length)
-    }
-    // we only get here if we have hit the end of the buffer
-  }
-
-  /* This method extracts the WET payload, whose length is specified in the
-   * Content-length header in actual octets (not UTF-8 bytes). If the payload is 
-   * only part of the buffer then this method will call searchForCompleteLine so
-   * that line by line processing of the WET file can continue.
-   *
-   * @param buffer the byte array to with bytes to process
-   * @param length the number of bytes to read from the buffer
-   */
-  def parseWetPayload(buffer: Array[Byte], length: Int): Unit = {
-    if (recordlength != 0 && (length - bufferbytesread < recordlength - contentbytesread)) {
-      // if what is left in the buffer < what is left in the record
-      // then grab the whole buffer
-      //println("Copied buffer to recordbuffer: copied "+length+" bytes")
-      recordbuffer.appendAll(buffer.slice(bufferbytesread,length))
-      contentbytesread += length - bufferbytesread
-      // the buffer is empty, this should return to parseBuffer which will then return to the call
-      // usually for them to fill to buffer again
-    } else if (recordlength != 0 && (length - bufferbytesread >= recordlength - contentbytesread)) {
-      // if what is left in the buffer >= what is left in the record
-      // the grab what is left in the record and pass the rest to the searchForCompleteLine hunter
-      //println("ContentBytesread "+contentbytesread+" length "+length+" recordlength "+recordlength+" bufferBytesRead "+bufferbytesread)
-      var recordendinbuffer = bufferbytesread + (recordlength - contentbytesread) // this is where the payload end in the buffer
-      //println("recordendinbuffer: "+recordendinbuffer)
-
-      recordbuffer.appendAll(buffer.slice(bufferbytesread, recordendinbuffer))
-      processRecord()
-      recordbuffer.clear()
-      printnextline = true
-      bufferbytesread = recordendinbuffer
-      contentbytesread = 0 // reset
-      recordlength = 0
-
-      // The record is done, if there is anything left in the buffer 
-      // go back to parsing WET record headers
-      if (bufferbytesread < length) {
-        //println("BufferBytesread = "+bufferbytesread+" Length is: "+length)
-        searchForCompleteLine(buffer, length)
-      }
-    }
-  }
-
-  /*
-   * Handle the processing and recording of completed WET records when we find them
-   */
-  def processRecord(): Unit = {
-    // We have a record, convert the bytes into a UTF-8 string and throw it in the
-    // ListBuffer that is holding our complete records
-    wetrecords += new String(recordbuffer.toArray, "UTF-8")
-  }
-
-  /* When we have extracted a complete line out of the read buffer
-   * this method is called to determine the proper action to take based 
-   * on the content of the line.
-   */
-  def checkLine(): Unit = {
-    var line = new String(linebuffer.toArray, "UTF-8")
-    if (printnextline) {
-      printnextline = false
-      //println("Line after content is: "+line)
-    }
-    if (line.startsWith("WARC-Type: conversion")) {
-      recordcount += 1
-    } else if (line.startsWith("Content-Length: ")) {
-      //println("Found content length line: "+line)
-      recordlength = line.split(": ").last.trim.toInt
-      recordlength += 2 // content always starts after next blank line \r\n
-    }
-  }
-
-  def getLineCount(): Int = {
-    return linecount
-  }
-  def getRecordCount(): Int = {
-    return recordcount
+    */
   }
 }
