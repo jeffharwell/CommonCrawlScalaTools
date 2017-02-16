@@ -216,7 +216,17 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
         }
 
         // Grab the next line and try to add it is a header
-        addHeaderToWARCObject(currentwarcinfo)
+        try {
+          addHeaderToWARCObject(currentwarcinfo)
+        } catch {
+          case e: WARCRecordTypeException => {
+            // apparently we are not parsing a warcinfo type WARC record
+            // move to the error state
+            lasterror = s"S1 -> Sink1: Record does not have WARC-Type = warcinfo as required, archive may be corrupt."
+            state1tries = 0
+            return(m(EX1))
+          }
+        }
 
         // event E1, assume we don't have a complete set of headers yet and keep looking
         return(m(E1))
@@ -306,7 +316,18 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
 
       state3tries += 1 // record our try
       // Grab the next line and try to add it is a header
-      addHeaderToWARCObject(currentwarcconversion)
+      try {
+        addHeaderToWARCObject(currentwarcconversion)
+      } catch {
+        case e: WARCRecordTypeException => {
+          // apparently we are not parsing a conversion type WARC record
+          // assume this record is corrupt and move to state S6 and start 
+          // scanning for a new WARC record to parse
+          state3tries = 0
+          return(m(E5))
+        }
+      }
+
 
       if (!currentwarcconversion.headersComplete()) {
         if (state3tries >= state3trylimit) {

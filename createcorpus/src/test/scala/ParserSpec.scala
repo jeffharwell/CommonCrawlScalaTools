@@ -89,6 +89,8 @@ class ParserSpec extends FlatSpec {
   val corruptinfo1 = this.getClass().getClassLoader().getResource("corrupt_warcinfo_1.wet.gz")
   val corruptconversion1 = this.getClass().getClassLoader().getResource("corrupt_warcconversion_1.wet.gz")
   val corruptconversion2 = this.getClass().getClassLoader().getResource("corrupt_warcconversion_2.wet.gz")
+  val corruptunexpectedconversion = this.getClass().getClassLoader().getResource("corrupt_starts_with_conversion.wet.gz")
+  val corruptunexpectedinfo = this.getClass().getClassLoader().getResource("corrupt_two_warcinfo.wet.gz")
 
 
 
@@ -260,6 +262,23 @@ class ParserSpec extends FlatSpec {
     assert(tries == limit) // we should have tried up to the limit 
   }
 
+  "parser" should "bail to error Sink1 if the initial WARC record is not of type 'warcinfo'" in {
+    val parser = new ParserTest(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+    parser.setDebug()
+
+    val winfo = new WARCInfo()
+    val limit = 100
+    var tries = 0
+
+    while (parser.getParserState() == "S1" && tries < limit ) {
+      tries += 1
+      parser.nextFSAStep()
+    }
+    assert(tries < limit) // infinite loop?
+    assert(parser.getParserState == "Sink1") // we should end up in the error state
+  }
+
   "parser" should "bail to error Sink1 if unable to get a complete warcinfo header in a predetermined number of tries because no warcinfo record exists" in {
     val parser = new ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag2.getFile()))))
@@ -393,6 +412,20 @@ class ParserSpec extends FlatSpec {
     assert(parser.getParserState == "Sink2") // we should end up in the error state
   }
 
+  "parser" should "skip any non-conversion type records after the 'warcinfo' type record is parsed" in {
+    val parser = new Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedinfo.getFile()))))
+    parser.setDebug()
+    var records = ListBuffer[WARCRecord]()
+
+    parser.foreach((wc: WARCRecord) => records += wc)
+    assert(records.size == 5)
+
+    // Make sure they are all conversion type records
+    records.foreach( r => {
+      assert(r.fields("WARC-Type") == "conversion")
+    })
+  }
 
   "parser" should "return 4 WARCRecord objects skipping corrupt record in file corruptconversion1" in {
     val parser = new Parser(new BufferedInputStream(
