@@ -2,6 +2,7 @@ import org.scalatest._
 import Matchers._
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
+import com.jeffharwell.commoncrawl.createcorpus.WARCRecordTypeException
 import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
 //import scala.collection.mutable.Map
 
@@ -9,14 +10,16 @@ class WARCRecordSpec extends FlatSpec {
 
   // Default warcinfo type required fields and values
   val warcinforequired = Map[String,String](
-     "WARC-Date" -> "2016-12-13T03:22:59Z"
+     "WARC-Type" -> "warcinfo"
+    ,"WARC-Date" -> "2016-12-13T03:22:59Z"
     ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
     ,"WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>"
     ,"Content-Type" -> "application/warc-fields"
     ,"Content-Length" -> "259")
 
-  "WARCInfo Object" should "have these 6 specific required fields" in {
+  "WARCInfo Object" should "have these 7 specific required fields" in {
     val requiredfields: List[String] = List[String](
+                                                  "WARC-Type",
 						  "WARC-Date",
 						  "WARC-Filename",
 						  "WARC-Record-ID",
@@ -28,8 +31,9 @@ class WARCRecordSpec extends FlatSpec {
     assert(requiredfields.toSet == warcinfo.requiredfields.toSet)
   }
 
-  "WARCConversion Object" should "have these 8 specific required fields" in {
+  "WARCConversion Object" should "have these 9 specific required fields" in {
     val requiredfields: List[String] = List[String](
+                                                  "WARC-Type",
                                                   "WARC-Target-URI",
                                                   "WARC-Date",
                                                   "WARC-Record-ID",
@@ -43,17 +47,29 @@ class WARCRecordSpec extends FlatSpec {
     assert(requiredfields.toSet == warc.requiredfields.toSet)
   }
 
-  "WARCInfo Object" should "report that it has 6 required fields at initialization" in {
+  "WARCInfo Object" should "report that it has 7 required fields at initialization" in {
     val warc = new WARCInfo()
-    assert(warc.numberRequiredFields == 6)
+    assert(warc.numberRequiredFields == 7)
   }
-  "WARCConversion Object" should "report that it has 8 required fields at initialization" in {
+  "WARCConversion Object" should "report that it has 9 required fields at initialization" in {
     val warc = new WARCConversion()
-    assert(warc.numberRequiredFields == 8)
+    assert(warc.numberRequiredFields == 9)
+  }
+
+  "WARCInfo" should "throw WARCRecordTypeException if WARC-Type is not 'warcinfo'" in {
+    val w = new WARCInfo()
+
+    assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "conversion")) }
+  }
+
+  "WARCConversion" should "throw WARCRecordTypeException if WARC-Type is not 'conversion'" in {
+    val w = new WARCConversion()
+
+    assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "warcinfo")) }
   }
 
 
-  "Instance of WARCRecord" should "allow optional fields" in {
+  "WARCRecord Instance" should "allow optional fields" in {
     // If the WETRecord is passed a field it doesn't know about it should ignore
     // it.
     val w = new WARCInfo()
@@ -68,6 +84,7 @@ class WARCRecordSpec extends FlatSpec {
     val w = new WARCInfo()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "warcinfo",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
@@ -85,6 +102,7 @@ class WARCRecordSpec extends FlatSpec {
     val w = new WARCInfo()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "warcinfo",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
@@ -101,6 +119,7 @@ class WARCRecordSpec extends FlatSpec {
     val w = new WARCInfo()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "warcinfo",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
@@ -129,6 +148,7 @@ class WARCRecordSpec extends FlatSpec {
     val w: WARCConversion = new WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
       "WARC-Target-URI" -> "my uri",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
@@ -153,6 +173,7 @@ class WARCRecordSpec extends FlatSpec {
     val w: WARCConversion = new WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
       "WARC-Target-URI" -> "my uri",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
@@ -177,6 +198,7 @@ class WARCRecordSpec extends FlatSpec {
     val w: WARCConversion = new WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
       "WARC-Target-URI" -> "my uri",
       "WARC-Date" -> "2016-12-13T03:22:59Z",
       "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",

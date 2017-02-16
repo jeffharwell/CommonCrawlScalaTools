@@ -2,6 +2,7 @@ package com.jeffharwell.commoncrawl.createcorpus
 
 class WARCInfo() extends WARCRecord {
   override val requiredfields: List[String] = List[String](
+                                              "WARC-Type",
                                               "WARC-Date",
                                               "WARC-Filename",
                                               "WARC-Record-ID",
@@ -21,4 +22,21 @@ class WARCInfo() extends WARCRecord {
     }
     return fields("Content-Length").toInt
   }
+
+  /*
+   * Add optional fields in case you want to add additional fields to 
+   * this WARC record in addition to the required ones.
+   *
+   * @param m A map with the field and value to add
+   */
+  def addFields(m: scala.collection.immutable.Map[String, String]): Unit = {
+    m.foreach { case (k, v) => 
+      fields += k -> v
+      // Check to make sure we are receiving headers for the right kind of record
+      if (k == "WARC-Type" && v != "warcinfo") {
+        throw new WARCRecordTypeException(s"Expecting WARC-Type = warcinfo but found ${v} instead")
+      }
+    }
+  }
+
 }

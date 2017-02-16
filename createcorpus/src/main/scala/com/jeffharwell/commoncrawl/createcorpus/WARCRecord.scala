@@ -16,6 +16,15 @@ abstract class WARCRecord {
   val additionalrequiredfields: ListBuffer[String] = ListBuffer[String]()
 
   /*
+   * Add optional fields in case you want to add additional fields to 
+   * this WARC record in addition to the required ones.
+   *
+   * @param m A map with the field and value to add
+   */
+  def addFields(m: scala.collection.immutable.Map[String, String]): Unit
+
+
+  /*
    * Returns the number of fields that are required. This will include Content if
    * that is defined. Don't use this to try to determine if the WARCRecord is complete,
    * for that purpose use isComplete() and headersComplete() instead
@@ -80,8 +89,6 @@ abstract class WARCRecord {
     return true
   }
 
-
-
   /*
    * Adds a required field to the WET record. isComplete() will not return
    * true until there is a key in the fields map that matches each field in 
@@ -104,16 +111,5 @@ abstract class WARCRecord {
     fields += "Content" -> cs
   }
 
-  /*
-   * Add optional fields in case you want to add additional fields to 
-   * this WARC record in addition to the required ones.
-   *
-   * @param m A map with the field and value to add
-   */
-  def addFields(m: scala.collection.immutable.Map[String, String]): Unit = {
-    m.foreach { case (k, v) => 
-      fields += k -> v
-    }
-  }
 }
 
