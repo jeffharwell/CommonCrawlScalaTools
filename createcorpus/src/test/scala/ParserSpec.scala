@@ -1,11 +1,11 @@
-import collection.mutable.Stack
-import scala.collection.immutable.Map
-import scala.collection.mutable.ListBuffer
 import org.scalatest._
 import com.jeffharwell.commoncrawl.createcorpus.Parser
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
 import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
+import collection.mutable.Stack
+import scala.collection.immutable.Map
+import scala.collection.mutable.ListBuffer
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.File

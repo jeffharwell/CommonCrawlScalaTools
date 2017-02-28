@@ -111,5 +111,18 @@ abstract class WARCRecord {
     fields += "Content" -> cs
   }
 
+  /*
+   * Returns the content of the WARC Record
+   *
+   * @return an Option[String] that has the content if there is any
+   */
+  def getContent(): Option[String] = {
+    if (fields.contains("Content")) {
+      return Some(fields("Content"))
+    } else {
+      return None
+    }
+  }
+
 }
 

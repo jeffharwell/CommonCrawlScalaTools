@@ -1,6 +1,6 @@
 package com.jeffharwell.commoncrawl.createcorpus
 
-class WARCConversion() extends WARCRecord {
+class WARCConversion() extends WARCRecord with WARCCategorizer {
   override val requiredfields: List[String] = List[String](
                                               "WARC-Type",
                                               "WARC-Target-URI",
@@ -83,6 +83,17 @@ class WARCConversion() extends WARCRecord {
         throw new WARCRecordTypeException(s"Expecting WARC-Type = conversion but found ${v} instead")
       }
     }
+  }
+
+  /*
+   * Adds the content of the WET Record
+   *
+   * @param cs the content to be added to the record
+   * @return Unit
+   */
+  override def addContent(cs: String): Unit = {
+    fields += "Content" -> cs
+    categorize(cs)
   }
 
 

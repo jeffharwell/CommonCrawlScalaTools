@@ -324,7 +324,7 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
           // assume this record is corrupt and move to state S6 and start 
           // scanning for a new WARC record to parse
           state3tries = 0
-          return(m(E5))
+          return(m(E7))
         }
       }
 

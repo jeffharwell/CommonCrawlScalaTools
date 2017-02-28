@@ -3,8 +3,6 @@ import Matchers._
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecordTypeException
-import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
-//import scala.collection.mutable.Map
 
 class WARCRecordSpec extends FlatSpec {
 
@@ -31,29 +29,9 @@ class WARCRecordSpec extends FlatSpec {
     assert(requiredfields.toSet == warcinfo.requiredfields.toSet)
   }
 
-  "WARCConversion Object" should "have these 9 specific required fields" in {
-    val requiredfields: List[String] = List[String](
-                                                  "WARC-Type",
-                                                  "WARC-Target-URI",
-                                                  "WARC-Date",
-                                                  "WARC-Record-ID",
-                                                  "WARC-Refers-To",
-                                                  "WARC-Block-Digest",
-                                                  "Content-Type",
-                                                  "Content-Length",
-                                                  "Content")
-    
-    val warc = new WARCConversion()
-    assert(requiredfields.toSet == warc.requiredfields.toSet)
-  }
-
   "WARCInfo Object" should "report that it has 7 required fields at initialization" in {
     val warc = new WARCInfo()
     assert(warc.numberRequiredFields == 7)
-  }
-  "WARCConversion Object" should "report that it has 9 required fields at initialization" in {
-    val warc = new WARCConversion()
-    assert(warc.numberRequiredFields == 9)
   }
 
   "WARCInfo" should "throw WARCRecordTypeException if WARC-Type is not 'warcinfo'" in {
@@ -61,13 +39,6 @@ class WARCRecordSpec extends FlatSpec {
 
     assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "conversion")) }
   }
-
-  "WARCConversion" should "throw WARCRecordTypeException if WARC-Type is not 'conversion'" in {
-    val w = new WARCConversion()
-
-    assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "warcinfo")) }
-  }
-
 
   "WARCRecord Instance" should "allow optional fields" in {
     // If the WETRecord is passed a field it doesn't know about it should ignore
@@ -135,104 +106,6 @@ class WARCRecordSpec extends FlatSpec {
     val w = new WARCInfo()
 
     assertThrows[RuntimeException] { w.getContentSizeInBytes() }
-  }
-
-
-
-  "WARCConversion" should "be complete with these fields and content" in {
-    // First create the WARCInfo we need
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
- 
-    val w: WARCConversion = new WARCConversion()
-
-    val requiredfields: Map[String,String] = Map[String,String](
-      "WARC-Type" -> "conversion",
-      "WARC-Target-URI" -> "my uri",
-      "WARC-Date" -> "2016-12-13T03:22:59Z",
-      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
-      "WARC-Refers-To" -> "my refers to",
-      "WARC-Block-Digest" -> "my block digest",
-      "Content-Type" -> "my content type",
-      "Content-Length" -> "my content length")
-
-    w.addFields(requiredfields)
-    w.addContent("This is my content") 
-    w.addWARCInfo(winfo)
-    
-    assert(w.isComplete() === true)
-  }
-
-  "WARCConversion" should "headersComplete returns true when all headers are populated but no content" in {
-    // First create the WARCInfo we need
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
- 
-    val w: WARCConversion = new WARCConversion()
-
-    val requiredfields: Map[String,String] = Map[String,String](
-      "WARC-Type" -> "conversion",
-      "WARC-Target-URI" -> "my uri",
-      "WARC-Date" -> "2016-12-13T03:22:59Z",
-      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
-      "WARC-Refers-To" -> "my refers to",
-      "WARC-Block-Digest" -> "my block digest",
-      "Content-Type" -> "my content type",
-      "Content-Length" -> "my content length")
-
-    assert(w.headersComplete() === false)
-
-    w.addFields(requiredfields)
-    
-    assert(w.headersComplete() === true)
-  }
-
-  "WARCConversion" should "should know content length once headers are complete" in {
-    // First create the WARCInfo we need
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
- 
-    val w: WARCConversion = new WARCConversion()
-
-    val requiredfields: Map[String,String] = Map[String,String](
-      "WARC-Type" -> "conversion",
-      "WARC-Target-URI" -> "my uri",
-      "WARC-Date" -> "2016-12-13T03:22:59Z",
-      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
-      "WARC-Refers-To" -> "my refers to",
-      "WARC-Block-Digest" -> "my block digest",
-      "Content-Type" -> "my content type",
-      "Content-Length" -> "35")
-
-    w.addFields(requiredfields)
-    
-    assert(w.headersComplete() === true)
-    assert(w.getContentSizeInBytes() == 35)
-  }
-
-  "WARCConversion" should "should throw an exception if content size is requested before headers are complete" in {
-    val w: WARCConversion = new WARCConversion()
-
-    assertThrows[RuntimeException] { w.getContentSizeInBytes() }
-  }
-
-
-  "WARCConversion" should "warcInfoComplete returns true after a completed WARCInfo object is added, false otherwise" in {
-    // First create the WARCInfo we need
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
- 
-    val w: WARCConversion = new WARCConversion()
-
-    assert(w.warcInfoComplete() === false)
-
-    w.addWARCInfo(winfo)
-    
-    assert(w.warcInfoComplete() === true)
   }
 
   "WARCRecord" should "allow you to add a required field" in {
