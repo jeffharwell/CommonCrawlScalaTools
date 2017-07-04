@@ -61,7 +61,7 @@ class MyWARCFilter() extends IsAWARCFilter {
     // of mentions
     //
     // detailCheck is the more expensive check 
-    if (containsKeywords(w)) { detailCheck(w) }
+    if (containsKeywords(w.fields("Content"), minimummentions)) { detailCheck(w) }
     else { false }
   }
 
@@ -81,19 +81,37 @@ class MyWARCFilter() extends IsAWARCFilter {
     // Split chunks by spaces into "words"
     // Throw out the chunks that don't match our criteria
     // Run cimatch over the remaining chunks
-    containsKeywords(wrecord)
+
+    // Single liner .. takes a string and first splits it by lines then by periods
+    val chunks = wrecord.fields("Content").split("\\n").foldLeft(List[String]()) { (x, t) => x ++ t.split("\\. ") }
+
+    // This is a bit tricky,
+    // write a recursive function that checks each chunk to see if it is 
+    // < 50 "words" but greater than 7 "words". If so check containsKeyword. If 
+    // true then we are done, it passes the filter, if false then grab the next chunk.
+    def checkChunks(chunks: List[String]): Boolean = {
+      val chunk = chunks.head
+      val t = chunks.tail
+
+      val chunksize = chunk.split(" ").size
+      // It only has to
+      if (chunksize > 7 && chunksize < 50 && containsKeywords(chunk, 1)) { true }
+      else if (t.size == 0) { false }
+      else { checkChunks(t) }
+    }
+    checkChunks(chunks)
   }
 
-  def containsKeywords[A <: WARCRecord](wrecord: A): Boolean = {
-    def checkKeyword[A <: WARCRecord](wrecord: A, keywordlist: List[String]): Boolean = {
+  def containsKeywords(tocheck: String, mentions: Int): Boolean = {
+    def checkKeyword(tocheck: String, keywordlist: List[String]): Boolean = {
       val keyword = keywordlist.head
       val t = keywordlist.tail
       
-      if (ciMatch(wrecord.fields("Content"), keyword) >= minimummentions) { true }
+      if (ciMatch(tocheck, keyword) >= mentions) { true }
       else if (t.size == 0) { false }
-      else { checkKeyword(wrecord, t) }
+      else { checkKeyword(tocheck, t) }
     }
-    checkKeyword(wrecord, keywords)
+    checkKeyword(tocheck, keywords)
   }
 
   /* ciMatch
