@@ -23,12 +23,7 @@ class MyWARCFilter() extends IsAWARCFilter {
    * I expect it to need to filter around 1 billion documents and extract the .1% that are
    * actually interesting for my research.
    */
-  val keywords = Map[String, String](
-    "trump" -> "politics",
-    "clinton" -> "politics",
-    "presidential" -> "politics",
-    "asthma" -> "politics"
-  )
+  val keywords = List[String]("trump","clinton","presidential","asthma")
 
   // controls how many times a keyword must be mentioned in the 
   // content before it is considered a match. Defaults to 7.
@@ -61,14 +56,16 @@ class MyWARCFilter() extends IsAWARCFilter {
    * @return a boolean, either the record passed the filter or doesn't
    */
   def apply[A <: WARCRecord](w: A): Boolean = {
-    // This is the first check
-    keywords foreach { case(keyword, category) => 
-      if (ciMatch(w.fields("Content"), keyword) >= minimummentions ) {
-        return true
-      }
-    }
-    return false
+    // containsKeywords is the simple check, just does a fast pattern match for each 
+    // keyword in the content and returns true if any keyword passes a minimum number 
+    // of mentions
+    //
+    // detailCheck is the more expensive check 
+    if (containsKeywords(w)) { detailCheck(w) }
+    else { false }
+  }
 
+  def detailCheck[A <: WARCRecord](wrecord: A): Boolean = {
     // Now the more extensive check, if anything matched split the content
     // into lines and make sure there is at least one match on a line where
     // the wordcount is greater than 7 (I just made that number up) but less than 50
@@ -78,6 +75,25 @@ class MyWARCFilter() extends IsAWARCFilter {
     // the indicies of the match in the content, then I split the content by ". " look at
     // the starting and ending indices (have to screw with it a bit to account for 
     // the missing ". ") and then count the words for the matching strings
+
+    // Hmm, lets try this first
+    // Split content by newlines into chunks
+    // Split chunks by spaces into "words"
+    // Throw out the chunks that don't match our criteria
+    // Run cimatch over the remaining chunks
+    containsKeywords(wrecord)
+  }
+
+  def containsKeywords[A <: WARCRecord](wrecord: A): Boolean = {
+    def checkKeyword[A <: WARCRecord](wrecord: A, keywordlist: List[String]): Boolean = {
+      val keyword = keywordlist.head
+      val t = keywordlist.tail
+      
+      if (ciMatch(wrecord.fields("Content"), keyword) >= minimummentions) { true }
+      else if (t.size == 0) { false }
+      else { checkKeyword(wrecord, t) }
+    }
+    checkKeyword(wrecord, keywords)
   }
 
   /* ciMatch
