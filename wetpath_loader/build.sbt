@@ -6,7 +6,7 @@ name := "WetPathLoader"
 
 version := "0.0.2"
 
-scalaVersion := "2.12.0"
+scalaVersion := "2.10.5"
 
 publishMavenStyle := true
 

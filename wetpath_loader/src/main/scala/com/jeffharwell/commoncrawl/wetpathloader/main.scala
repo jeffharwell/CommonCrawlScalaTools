@@ -37,8 +37,11 @@ object Main extends App {
     val fileResource = Option(this.getClass().getClassLoader().getResource(sourceString))
 
     fileResource match {
-      case Some(f) => return(scala.io.Source.fromResource(sourceString))
-      case None            => println(s"Didn't fined a resource $sourceString")
+      // This is much nicer, but only works in Scala 2.12.x
+      // See https://stackoverflow.com/questions/27360977/how-to-read-files-from-resources-folder-in-scala
+      //case Some(f) => return(scala.io.Source.fromResource(sourceString))
+      case Some(f) => return(scala.io.Source.fromInputStream(this.getClass().getClassLoader().getResourceAsStream(sourceString)))
+      case None    => println(s"Didn't fined a resource $sourceString")
     }
 
     /* Now check the filesystem */

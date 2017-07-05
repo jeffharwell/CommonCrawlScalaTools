@@ -1,5 +1,14 @@
 package com.jeffharwell.commoncrawl.createcorpus
 
+// Allows you to say var wi = WARCInfo() and get your object back
+// this make it consistent with the usage of WARCConversion which has
+// to use the helper object because it has multiple constructors.
+object WARCInfo {
+  def apply() = {
+    new WARCInfo()
+  }
+}
+
 class WARCInfo() extends WARCRecord {
   override val requiredfields: List[String] = List[String](
                                               "WARC-Type",

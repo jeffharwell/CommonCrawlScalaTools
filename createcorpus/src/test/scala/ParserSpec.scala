@@ -304,7 +304,7 @@ class ParserSpec extends FlatSpec {
     parser.setDebug()
 
     // limit is hard coded as # of required WARC fields + 4
-    val winfo = new WARCConversion()
+    val winfo = WARCConversion()
     val limit = winfo.numberRequiredFields() + 4
     var tries = 0
 
@@ -341,7 +341,7 @@ class ParserSpec extends FlatSpec {
     parser.setDebug()
 
     // limit is hard coded as # of required WARC fields + 4
-    val winfo = new WARCConversion()
+    val winfo = WARCConversion()
     val limit = winfo.numberRequiredFields() + 4
     var tries = 0
 
@@ -385,7 +385,7 @@ class ParserSpec extends FlatSpec {
     parser.setDebug()
 
     // limit is hard coded as # of required WARC fields + 4
-    val winfo = new WARCConversion()
+    val winfo = WARCConversion()
     val limit = winfo.numberRequiredFields() + 4
     var tries = 0
 

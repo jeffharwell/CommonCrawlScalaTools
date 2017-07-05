@@ -34,7 +34,7 @@ class MyWARCFilterSpec extends FlatSpec {
       "Content-Type" -> "text"
     )
 
-    val w = new WARCConversion()
+    val w = WARCConversion()
     w.addWARCInfo(winfo)
     w.addFields(requiredfields)
     w.addFields(Map[String,String]("Content-Length" -> content.getBytes("UTF-8").size.toString()))
@@ -64,6 +64,16 @@ class MyWARCFilterSpec extends FlatSpec {
     assert(!f(crtest1))
   }
 
+  "MyWARCFilter" should "reject text when the keyword only appears in its own line" in
+  {
+    val crtest1 = createDummyWARCRecordWithContent(taglist)
+    val f = new MyWARCFilter()
+    f.setMinMentions(1)
+
+    assert(!f(crtest1))
+  }
+
+
 /*
  * Here is the sample data used to test filter. It consists of a few samples
  * taken from. 
@@ -72,7 +82,7 @@ class MyWARCFilterSpec extends FlatSpec {
  * You can also find the complete WARC records in the resource file filter_test_1.wet.gz
  *
  * One of the nastiest problems with this content is how to divide sentences. I 
- * tried to grab sample content the illustrates this problem
+ * tried to grab sample content that illustrates this problem
  *
  * Wanting to accept the text from mixperiodandcarriagereturn, but reject the text
  * from asthmaweather while also rejecting the text from keywordstuffing illustrates 

@@ -26,8 +26,8 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
   var currentwarcinfo: WARCInfo = new WARCInfo() // this holds the WARCInfo object that
                                                  // gives the context for all of the 
                                                  // conversion records in the file
-  var currentwarcconversion: WARCConversion = new WARCConversion() // this holds the conversion
-                                                                   // record we are working on right now
+  var currentwarcconversion: WARCConversion = WARCConversion() // this holds the conversion
+                                                               // record we are working on right now
   var hasnext: Boolean = true
 
   val statetrace = ListBuffer[State]()
@@ -404,7 +404,7 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
       if (debug) { statetrace += this }
 
       // create a new WARCConversion record
-      currentwarcconversion = new WARCConversion()
+      currentwarcconversion = WARCConversion()
       // Return state S3 which will start adding headers to the new record
       // that we just created.
       return(m(E9))
@@ -434,7 +434,7 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
         // alright, we might have found one, go to state 3 and try to parse it
         
         // create a new WARCConversion record
-        currentwarcconversion = new WARCConversion()
+        currentwarcconversion = WARCConversion()
 
         return(m(E9))
       } else {

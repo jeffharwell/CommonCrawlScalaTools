@@ -2,91 +2,34 @@ import org.scalatest._
 import com.jeffharwell.commoncrawl.createcorpus.Parser
 import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
-import com.jeffharwell.commoncrawl.createcorpus.WARCCategorizer
+import com.jeffharwell.commoncrawl.createcorpus.MyWARCCategorizer
 
-class WARCCategorizerSpec extends FlatSpec {
-
-  // Utility class to create a dummy WARCConversion record out of our content string
-  // so that we can pass it to the filter for testing.
-  def createDummyWARCRecordWithContent(content: String): WARCConversion = {
-    // Create the dummy WARCInfo object first
-    val warcinforequired = Map[String,String](
-       "WARC-Type" -> "warcinfo"
-      ,"WARC-Date" -> "2016-12-13T03:22:59Z"
-      ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
-      ,"WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>"
-      ,"Content-Type" -> "application/warc-fields"
-      ,"Content-Length" -> "This is my content".getBytes("UTF-8").size.toString()
-    )
-
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
-
-    // Now create the WARCConversion object
-    val requiredfields: Map[String,String] = Map[String,String](
-      "WARC-Type" -> "conversion",
-      "WARC-Target-URI" -> "https://not.a.real.site.com/",
-      "WARC-Date" -> "2016-12-13T03:22:59Z",
-      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
-      "WARC-Refers-To" -> "DummyRefersToContent",
-      "WARC-Block-Digest" -> "DummyDigest",
-      "Content-Type" -> "text"
-    )
-
-    val w = new WARCConversion()
-    w.addWARCInfo(winfo)
-    w.addFields(requiredfields)
-    w.addFields(Map[String,String]("Content-Length" -> content.getBytes("UTF-8").size.toString()))
-    w.addContent(content)
-    return w
-  }
-
-  // Implementation of the trait for testing
-  class Categorizer extends WARCCategorizer
+class MyWARCCategorizerSpec extends FlatSpec {
 
  /*
  * Unit Tests
  */
 
-  "WARCCategorizer" should "categorizer a paragraph that only mentions the keyword once with minmentions = 1" in
+  "MyWARCCategorizer" should "categorizer a paragraph that only mentions the keyword once with minmentions = 1" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val c = new Categorizer()
+    val c = new MyWARCCategorizer()
     c.setMinMentions(1)
-
-    crtest1.getContent() match {
-      case Some(content) => assert(c.categorize(content).getCategories.size > 0)
-      case None => assert(false) // this should never happen
-    }
-
-    assert(c.hascategories)
+    assert(c.categorize(testcontent1).getCategories.size > 0)
   }
 
-  "WARCCategorizer" should "categorizer testcontent1 as asthma when minmentions = 1" in
+  "MyWARCCategorizer" should "categorizer testcontent1 as asthma when minmentions = 1" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val c = new Categorizer()
+    val c = new MyWARCCategorizer()
     c.setMinMentions(1)
-
-    crtest1.getContent() match {
-      case Some(content) => assert(c.categorize(content).getCategories == List("asthma"))
-      case None => assert(false) // this should never happen
-    }
+    c.categorize(testcontent1).getCategories == List("asthma")
   }
 
 
-  "MyWARCFilter" should "not categorizer a paragraph that only mentions the keyword once with minmentions = 2" in
+  "MyWARCCategorizer" should "not categorizer a paragraph that only mentions the keyword once with minmentions = 2" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val c = new Categorizer()
+    val c = new MyWARCCategorizer()
     c.setMinMentions(2)
-
-    crtest1.getContent() match {
-      case Some(content) => assert(!c.categorize(content).hascategories)
-      case None => assert(false) // this should never happen
-    }
-
+    assert(!c.categorize(testcontent1).hasCategories)
   }
 
 /*

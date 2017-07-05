@@ -1,6 +1,68 @@
 package com.jeffharwell.commoncrawl.createcorpus
 
-class WARCConversion() extends WARCRecord with WARCCategorizer {
+
+/*
+ * WARCConversion Factory Companion Object
+ *
+ * This is needed in order to implement multiple constructors and
+ * encapsulate the definition of the EmptyCategorizer class.
+ *
+ * http://daily-scala.blogspot.com/2009/11/multiple-constructors.html
+ */
+object WARCConversion {
+  /*
+   * When no arguments are supplied create a class that implements WARCCategorizer
+   * and never categorizes anything and pass that to the constructor.
+   */
+  def apply(): WARCConversion = {
+    // Define the absolute minimum WARCCategorizer, it doesn't do anything
+    class EmptyCategorizer() extends WARCCategorizer {
+      val emptylist = List[String]()
+      def hasCategories(): Boolean = {
+        false
+      }
+      def getCategories(): List[String] = {
+        emptylist
+      }
+      def categorize(s: String): WARCCategorizer = {
+        // doesn't do anything and returns itself
+        // remember that Scala the last expression is taken 
+        // as the value that is returned.
+        // https://tpolecat.github.io/2014/05/09/return.html
+        this
+      }
+    }
+
+    new WARCConversion(new EmptyCategorizer)
+  } 
+
+  /*
+   * In this case an object that is a sub-type of WARCCategorizer has specified
+   * been passed, so just pass that to the WARCConversion constructor
+   */
+  def apply[A <: WARCCategorizer](c: A): WARCConversion = {
+    new WARCConversion(c)
+  } 
+} 
+
+
+class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord with WARCCategorizer {
+
+  val categorizer = acategorizer
+
+  // Our implementation of the WARCCategorizer, just wrap the categorizer that we were passed
+  // this feels a bit boilerplate'ie but I want to be able to treat the WARCRecord as a 
+  // categorizer itself.
+  def hasCategories(): Boolean = {
+    categorizer.hasCategories()
+  }
+  def getCategories(): List[String] = {
+    categorizer.getCategories()
+  }
+  def categorize(s: String): WARCCategorizer = {
+    categorizer.categorize(s)
+  }
+
   override val requiredfields: List[String] = List[String](
                                               "WARC-Type",
                                               "WARC-Target-URI",
@@ -13,6 +75,7 @@ class WARCConversion() extends WARCRecord with WARCCategorizer {
                                               "Content")
 
   var requiredwarcinfo:Option[WARCInfo] = None
+
 
   /*
    * Set the WARCInfo object that gives the context for this WARCConversion object
@@ -35,6 +98,7 @@ class WARCConversion() extends WARCRecord with WARCCategorizer {
    * @return Boolean, true if a value for every field and WARCInfo object exists, false otherwise
    */
   override def isComplete(): Boolean = {
+    // how on earth to I refactor this to avoid return??
     if (super.isComplete()) {
       requiredwarcinfo match {
         case Some(x) => return x.isComplete()
@@ -66,7 +130,7 @@ class WARCConversion() extends WARCRecord with WARCCategorizer {
     if (!this.headersComplete()) {
       throw new RuntimeException("Cannot be sure of content length until all headers are required headers are added.")
     }
-    return fields("Content-Length").toInt
+    fields("Content-Length").toInt
   }
 
  /*

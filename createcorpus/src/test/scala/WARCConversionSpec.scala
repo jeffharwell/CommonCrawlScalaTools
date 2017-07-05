@@ -4,6 +4,7 @@ import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecordTypeException
 import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
+import com.jeffharwell.commoncrawl.createcorpus.MyWARCCategorizer
 //import scala.collection.mutable.Map
 
 class WARCConversionSpec extends FlatSpec {
@@ -43,17 +44,17 @@ class WARCConversionSpec extends FlatSpec {
                                                   "Content-Length",
                                                   "Content")
     
-    val warc = new WARCConversion()
+    val warc = WARCConversion()
     assert(requiredfields.toSet == warc.requiredfields.toSet)
   }
 
   "WARCConversion Object" should "report that it has 9 required fields at initialization" in {
-    val warc = new WARCConversion()
+    val warc = WARCConversion()
     assert(warc.numberRequiredFields == 9)
   }
 
   "WARCConversion" should "throw WARCRecordTypeException if WARC-Type is not 'conversion'" in {
-    val w = new WARCConversion()
+    val w = WARCConversion()
 
     assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "warcinfo")) }
   }
@@ -64,7 +65,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val w: WARCConversion = WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
       "WARC-Type" -> "conversion",
@@ -89,7 +90,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val w: WARCConversion = WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
       "WARC-Type" -> "conversion",
@@ -114,7 +115,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val w: WARCConversion = WARCConversion()
 
     val requiredfields: Map[String,String] = Map[String,String](
       "WARC-Type" -> "conversion",
@@ -132,13 +133,43 @@ class WARCConversionSpec extends FlatSpec {
     assert(w.getContentSizeInBytes() == 35)
   }
 
-  "WARCConversion" should "should categorize this content as asthma" in {
+
+
+  "WARCConversion" should "should throw an exception if content size is requested before headers are complete" in {
+    val w: WARCConversion = WARCConversion()
+
+    assertThrows[RuntimeException] { w.getContentSizeInBytes() }
+  }
+
+
+  "WARCConversion" should "warcInfoComplete returns true after a completed WARCInfo object is added, false otherwise" in {
     // First create the WARCInfo we need
     val winfo = new WARCInfo()
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val w: WARCConversion = WARCConversion()
+
+    assert(w.warcInfoComplete() === false)
+
+    w.addWARCInfo(winfo)
+    
+    assert(w.warcInfoComplete() === true)
+  }
+
+  /*
+   * Testing Categorizers
+   */
+
+  "WARCConversion" should "should categorize this content as asthma with MyWARCCategorizer" in {
+    // First create the WARCInfo we need
+    val winfo = new WARCInfo()
+    winfo.addFields(warcinforequired)
+    winfo.addContent("This is my content") 
+ 
+    val c: MyWARCCategorizer = new MyWARCCategorizer()
+    c.setMinMentions(4)
+    val w: WARCConversion = WARCConversion(c)
 
     val content = "Asthma asthma asthma this should match the asthma category."
     val length = content.getBytes("UTF-8").size.toString()
@@ -153,21 +184,22 @@ class WARCConversionSpec extends FlatSpec {
       "Content-Type" -> "my content type",
       "Content-Length" -> length)
 
-    w.setMinMentions(4)
     w.addFields(requiredfields)
     w.addContent(content)
 
-    assert(w.hascategories)
+    assert(w.hasCategories)
     assert(w.getCategories == List[String]("asthma"))
   }
 
-  "WARCConversion" should "should categorize this content as asthma and politics" in {
+  "WARCConversion" should "should categorize this content as asthma and politics with MyWARCCategorizer" in {
     // First create the WARCInfo we need
     val winfo = new WARCInfo()
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val c: MyWARCCategorizer = new MyWARCCategorizer()
+    c.setMinMentions(4)
+    val w: WARCConversion = WARCConversion(c)
 
     val content = "Asthma trump asthma trump asthma trump this should match the asthma and trump politics category."
     val length = content.getBytes("UTF-8").size.toString()
@@ -182,21 +214,22 @@ class WARCConversionSpec extends FlatSpec {
       "Content-Type" -> "my content type",
       "Content-Length" -> length)
 
-    w.setMinMentions(4)
     w.addFields(requiredfields)
     w.addContent(content)
 
-    assert(w.hascategories)
+    assert(w.hasCategories)
     assert(w.getCategories.contains("asthma") && w.getCategories.contains("politics") && w.getCategories.size == 2)
   }
 
-  "WARCConversion" should "should not be able to categorize this content" in {
+  "WARCConversion" should "should not be able to categorize this content with MyWARCCategorizer" in {
     // First create the WARCInfo we need
     val winfo = new WARCInfo()
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val c: MyWARCCategorizer = new MyWARCCategorizer()
+    c.setMinMentions(4)
+    val w: WARCConversion = WARCConversion(c)
 
     val content = "This sentence should not match any content categories."
     val length = content.getBytes("UTF-8").size.toString()
@@ -211,35 +244,40 @@ class WARCConversionSpec extends FlatSpec {
       "Content-Type" -> "my content type",
       "Content-Length" -> length)
 
-    w.setMinMentions(4)
     w.addFields(requiredfields)
     w.addContent(content)
 
-    assert(!w.hascategories)
+    assert(!w.hasCategories)
     assert(w.getCategories.size == 0)
   }
 
-
-  "WARCConversion" should "should throw an exception if content size is requested before headers are complete" in {
-    val w: WARCConversion = new WARCConversion()
-
-    assertThrows[RuntimeException] { w.getContentSizeInBytes() }
-  }
-
-
-  "WARCConversion" should "warcInfoComplete returns true after a completed WARCInfo object is added, false otherwise" in {
+  "WARCConversion" should "should not categorize this content with default categorizer" in {
     // First create the WARCInfo we need
     val winfo = new WARCInfo()
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val w: WARCConversion = new WARCConversion()
+    val w: WARCConversion = WARCConversion()
 
-    assert(w.warcInfoComplete() === false)
+    val content = "Asthma trump asthma trump asthma trump this should match the asthma and trump politics category."
+    val length = content.getBytes("UTF-8").size.toString()
 
-    w.addWARCInfo(winfo)
-    
-    assert(w.warcInfoComplete() === true)
+    val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> length)
+
+    w.addFields(requiredfields)
+    w.addContent(content)
+
+    assert(!w.hasCategories)
+    assert(w.getCategories.size == 0)
   }
+
 
 }
