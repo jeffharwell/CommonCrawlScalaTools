@@ -2,6 +2,15 @@
 
 This is my collection of tools to manipulate Common Crawl data using Scala.
 
+### Create a Corpus from WET Archives
+
+To run the example code
+
+cd ./createcorpus
+
+> $ sbt
+> > runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered
+
 ### wetpath_loader ###
 
 This is my tool for reading the list of WET paths published by Common Crawl and loading them into a database table. To run:
