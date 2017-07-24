@@ -10,7 +10,10 @@ import scala.collection.mutable.ListBuffer
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.File
-//import java.io.InputStream
+import java.net.URL
+
+/* For the examples */
+//import scala.io.StdIn.readLine // scala 2.11 and greater
 
 
 //import MyWARCCategorizer
@@ -65,5 +68,38 @@ object CountLocalFiltered {
     println("Found "+records.size+" records from "+filename+" using filter MyWARCFilter")
     println("\nThe content of the first record is:\n")
     println(records(0).fields("Content"))
+
+
+  /*
+   * Example 3:
+   *
+   * Read and filter a compressed WET archive straight from the web.
+   */
+
+    //val input = scala.io.StdIn.readLine() // for Scala 2.11 and greater
+    val input = readLine("Do you want to parse a file straight from AWS? (y/n): ")
+    if (input != "y") {
+      println("Done with examples")
+      System.exit(0)
+    }
+
+    // This is the path from the wet.paths file
+    var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698540409.8/wet/CC-MAIN-20161202170900-00007-ip-10-31-129-80.ec2.internal.warc.wet.gz"
+    val urlbase = "https://commoncrawl.s3.amazonaws.com/"
+    val url = new URL(urlbase+filepath)
+    //println("URL is "+fileurl)
+    //val u = new File(fileurl.getFile())
+
+    // Create the parser
+    val parser_from_aws = new Parser(new BufferedInputStream(url.openStream()))
+
+   // Initialize a ListBuffer to hold the records
+    val records_from_aws = new ListBuffer[WARCRecord]()
+
+    val collection = parser_from_aws.withFilter(myfilter(_)).foreach((wc: WARCRecord) => records_from_aws += wc)
+    println("Found "+records_from_aws.size+" records from "+url+" using filter MyWARCFilter")
+    println("\nThe content of the first record is:\n")
+    println(records_from_aws(0).fields("Content"))
+
   }
 }

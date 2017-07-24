@@ -6,10 +6,14 @@ This is my collection of tools to manipulate Common Crawl data using Scala.
 
 To run the example code
 
-cd ./createcorpus
+    $ cd ./createcorpus
+    $ sbt
+    > runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered
 
-> $ sbt
-> > runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered
+or 
+
+    cd ./createcorpus
+    sbt "runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered"
 
 ### wetpath_loader ###
 
