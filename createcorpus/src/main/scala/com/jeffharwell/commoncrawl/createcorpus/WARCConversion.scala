@@ -17,12 +17,12 @@ object WARCConversion {
   def apply(): WARCConversion = {
     // Define the absolute minimum WARCCategorizer, it doesn't do anything
     class EmptyCategorizer() extends WARCCategorizer {
-      val emptylist = List[String]()
+      val emptyset = Set[String]()
       def hasCategories(): Boolean = {
         false
       }
-      def getCategories(): List[String] = {
-        emptylist
+      def getCategories(): Set[String] = {
+        emptyset
       }
       def categorize(s: String): WARCCategorizer = {
         // doesn't do anything and returns itself
@@ -46,7 +46,7 @@ object WARCConversion {
 } 
 
 
-class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord with WARCCategorizer {
+class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
 
   val categorizer = acategorizer
 
@@ -55,9 +55,6 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord with WARC
   // categorizer itself.
   def hasCategories(): Boolean = {
     categorizer.hasCategories()
-  }
-  def getCategories(): List[String] = {
-    categorizer.getCategories()
   }
   def categorize(s: String): WARCCategorizer = {
     categorizer.categorize(s)
@@ -76,6 +73,17 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord with WARC
 
   var requiredwarcinfo:Option[WARCInfo] = None
 
+  /*
+   * A WARCRecord should return a set of categories if applicable
+   *
+   * @return a Option[Set[String]]
+   */
+  override def getCategories(): Option[Set[String]] = {
+    // Wrapping this in makes it consistent with the way that the .get("field")
+    // method works. Also makes it explicit when there is actually not categories
+    // ,Option(None), vs the record doesn't match any categories, Option(Set())
+    Some(categorizer.getCategories())
+  }
 
   /*
    * Set the WARCInfo object that gives the context for this WARCConversion object

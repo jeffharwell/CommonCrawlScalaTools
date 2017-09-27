@@ -37,8 +37,8 @@ class MyWARCCategorizer extends WARCCategorizer {
   // The categories
   var categories = List[String]()
 
-  def getCategories(): List[String] = {
-    return categories
+  def getCategories(): Set[String] = {
+    return categories.toSet
   }
 
   // controls how many times a keyword must be mentioned in the 

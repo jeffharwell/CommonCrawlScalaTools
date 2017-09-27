@@ -5,7 +5,7 @@ import scala.collection.mutable.ListBuffer
 // Nothing fancy, just the requirements for implementing the different types of WARC records
 // Basically an abstract class
 
-abstract class WARCRecord {
+abstract class WARCRecord extends java.io.Serializable {
   // Object Variables ... 
   val requiredfields  = List[String]() // this must we overridden by methods inheriting this trait
 
@@ -22,6 +22,17 @@ abstract class WARCRecord {
    * @param m A map with the field and value to add
    */
   def addFields(m: scala.collection.immutable.Map[String, String]): Unit
+
+  /*
+   * A WARCRecord should return a set of categories if applicable
+   *
+   * The default implementation returns None
+   *
+   * @return a Option[Set[String]]
+   */
+  def getCategories(): Option[Set[String]] = {
+    None
+  }
 
 
   /*
@@ -118,9 +129,22 @@ abstract class WARCRecord {
    */
   def getContent(): Option[String] = {
     if (fields.contains("Content")) {
-      return Some(fields("Content"))
+      Some(fields("Content"))
     } else {
-      return None
+      None
+    }
+  }
+
+  /*
+   * Returns the value of an arbitrary field
+   *
+   * @return an Option[String] that has the content if there is any
+   */
+  def get(fieldname: String): Option[String] = {
+    if (fields.contains(fieldname)) {
+      Some(fields(fieldname))
+    } else {
+      None
     }
   }
 

@@ -5,10 +5,10 @@ package com.jeffharwell.commoncrawl.createcorpus
  *
  * Defines an interface (Java speak) that must be implemented by all WARC Categorizers
  */
-trait WARCCategorizer {
+trait WARCCategorizer extends java.io.Serializable {
   def hasCategories(): Boolean
 
-  def getCategories(): List[String]
+  def getCategories(): Set[String]
 
   /*
    * This method operates on shared state (boo?) to categorize the string passed to it.

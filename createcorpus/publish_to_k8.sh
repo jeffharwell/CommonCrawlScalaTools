@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCALAVERSION="2.10"
-VERSION="0.0.1"
+VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
 NAME="createcorpus"
 ORGANIZATION="com.jeffharwell"
 K8SCRIPTBASE="~/nginx_jar_repo"
@@ -20,6 +20,9 @@ do
     mv ${MVNLOCAL}/maven-metadata-local.${i} ${MVNLOCAL}/maven-metadata.${i}
 done
 
-scp -r ${MVNLOCAL} k8@k8master.fuller.edu:${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}-${VERSION}/m2
+#scp -r ${MVNLOCAL} k8@k8master.fuller.edu:${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}-${VERSION}/m2
 
-ssh k8@k8master.fuller.edu "${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}-${VERSION}/publish_files.sh"
+#ssh k8@k8master.fuller.edu "${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}-${VERSION}/publish_files.sh"
+#scp -r ${MVNLOCAL} k8@k8master.fuller.edu:${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}/m2
+rsync -arv -e ssh ${MVNLOCAL} k8@k8master.fuller.edu:${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}/m2
+ssh k8@k8master.fuller.edu "${K8SCRIPTBASE}/${NAME}_${SCALAVERSION}/publish_files.sh"

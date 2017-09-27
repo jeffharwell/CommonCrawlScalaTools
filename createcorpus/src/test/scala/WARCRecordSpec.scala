@@ -29,6 +29,11 @@ class WARCRecordSpec extends FlatSpec {
     assert(requiredfields.toSet == warcinfo.requiredfields.toSet)
   }
 
+  "WARCInfo Object" should "report that it has no categories" in {
+    val warc = new WARCInfo()
+    assert(warc.getCategories() == None)
+  }
+
   "WARCInfo Object" should "report that it has 7 required fields at initialization" in {
     val warc = new WARCInfo()
     assert(warc.numberRequiredFields == 7)

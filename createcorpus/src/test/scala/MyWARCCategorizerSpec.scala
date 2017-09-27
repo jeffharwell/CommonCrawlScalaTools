@@ -21,7 +21,7 @@ class MyWARCCategorizerSpec extends FlatSpec {
   {
     val c = new MyWARCCategorizer()
     c.setMinMentions(1)
-    c.categorize(testcontent1).getCategories == List("asthma")
+    c.categorize(testcontent1).getCategories == Set("asthma")
   }
 
 
