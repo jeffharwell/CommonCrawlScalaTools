@@ -11,8 +11,48 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.immutable.List
 import scala.collection.immutable.Map
 
+/*
+ * Parser Factory Companion Object
+ *
+ * This is needed in order to implement multiple constructors and
+ * encapsulate the definition of the EmptyCategorizer class.
+ *
+ * http://daily-scala.blogspot.com/2009/11/multiple-constructors.html
+ */
+object Parser {
+  /*
+   * When no arguments are supplied create a class that implements WARCCategorizer
+   * and never categorizes anything and pass that to the constructor.
+   */
+  def apply(inputstream: InputStream): Parser[EmptyCategorizer] = {
+    new Parser(inputstream, new EmptyCategorizer, 0)
+  }
 
-class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
+  /* 
+   * No categorizer passed, but do include a step limit
+   */
+  def apply(inputstream: InputStream, steplimit: Int): Parser[EmptyCategorizer] = {
+    new Parser(inputstream, new EmptyCategorizer, steplimit)
+  }
+
+  /*
+   * If a categorizer is passed then use it
+   */
+  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A): Parser[A] = {
+    new Parser(inputstream, categorizer, 0)
+  }
+
+  /*
+   * Categorizer and a steplimit
+   */
+  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int): Parser[A] = {
+    new Parser(inputstream, categorizer, steplimit)
+  }
+
+}
+
+
+class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int) extends Iterator[WARCRecord] {
 
   /*
    * The Constructor
@@ -26,12 +66,13 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
   var currentwarcinfo: WARCInfo = new WARCInfo() // this holds the WARCInfo object that
                                                  // gives the context for all of the 
                                                  // conversion records in the file
-  var currentwarcconversion: WARCConversion = WARCConversion() // this holds the conversion
-                                                               // record we are working on right now
+  var currentwarcconversion: WARCConversion = WARCConversion(categorizer) // this holds the conversion
+                                                                          // record we are working on right now
   var hasnext: Boolean = true
 
   val statetrace = ListBuffer[State]()
   var debug = false
+  var steps = 0
 
   var lasterror = "" // contains the last error, which is hopefully the reason
                      // we ended up in a given sink state
@@ -549,13 +590,18 @@ class Parser(inputstream: InputStream) extends Iterator[WARCRecord] {
     // this shouldn't return until the instance variable 'currentwarcconversion' is set
     // with a complete WARC conversion record
     var state: State = fsa.run()
-    while (state != Sink1 && state != Final && state != S5) {
+    steps = steps + 1
+    while (state != Sink1 && state != Sink2 && state != Final && state != S5) {
       state = fsa.run()
+      steps = steps + 1
+      if (steplimit > 0 && steps > steplimit) {
+        throw new RuntimeException(s"FSA Exceded the step limit ${steplimit}. Ended in state: "+state)
+      }
     }
 
     // These states mean we are done with the file one way
     // or another
-    if (state == Sink1 || state == Final) {
+    if (state == Sink1 || state == Sink2 || state == Final) {
       hasnext = false
     }
 

@@ -20,7 +20,7 @@ object Main extends App {
   val gzipFile: File = getTheFile(testwetfilename)
 
   var records: Int = 0;
-  val parser = new Parser(new BufferedInputStream(new FileInputStream(gzipFile)))
+  val parser = Parser(new BufferedInputStream(new FileInputStream(gzipFile)))
 
   // Count the Records
   records = parser.foldLeft(0) { (acc, i) =>

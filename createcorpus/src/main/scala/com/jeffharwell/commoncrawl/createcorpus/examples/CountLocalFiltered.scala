@@ -34,8 +34,7 @@ object CountLocalFiltered {
      */
 
     // Create the parser
-    val parser_no_filter = new Parser(new BufferedInputStream(
-      new FileInputStream(f)))
+    val parser_no_filter = Parser(new BufferedInputStream(new FileInputStream(f)))
 
     // Count the Records
     val record_count = parser_no_filter.foldLeft(0) { (acc, i) =>
@@ -56,8 +55,7 @@ object CountLocalFiltered {
     val myfilter = new MyWARCFilter()
 
     // Create the parser
-    val parser = new Parser(new BufferedInputStream(
-      new FileInputStream(f)))
+    val parser = Parser(new BufferedInputStream(new FileInputStream(f)))
 
     // Initialize a ListBuffer to hold the records
     val records = new ListBuffer[WARCRecord]()
@@ -91,7 +89,7 @@ object CountLocalFiltered {
     //val u = new File(fileurl.getFile())
 
     // Create the parser
-    val parser_from_aws = new Parser(new BufferedInputStream(url.openStream()))
+    val parser_from_aws = Parser(new BufferedInputStream(url.openStream()))
 
    // Initialize a ListBuffer to hold the records
     val records_from_aws = new ListBuffer[WARCRecord]()

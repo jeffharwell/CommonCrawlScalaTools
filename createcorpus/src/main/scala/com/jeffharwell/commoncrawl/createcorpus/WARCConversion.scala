@@ -16,6 +16,7 @@ object WARCConversion {
    */
   def apply(): WARCConversion = {
     // Define the absolute minimum WARCCategorizer, it doesn't do anything
+    /*
     class EmptyCategorizer() extends WARCCategorizer {
       val emptyset = Set[String]()
       def hasCategories(): Boolean = {
@@ -32,6 +33,7 @@ object WARCConversion {
         this
       }
     }
+    */
 
     new WARCConversion(new EmptyCategorizer)
   } 

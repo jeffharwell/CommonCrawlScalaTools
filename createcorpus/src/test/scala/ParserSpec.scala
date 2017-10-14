@@ -3,6 +3,9 @@ import com.jeffharwell.commoncrawl.createcorpus.Parser
 import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
 import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
 import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
+import com.jeffharwell.commoncrawl.createcorpus.EmptyCategorizer
+import com.jeffharwell.commoncrawl.createcorpus.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.createcorpus.WARCCategorizer
 import collection.mutable.Stack
 import scala.collection.immutable.Map
 import scala.collection.mutable.ListBuffer
@@ -11,7 +14,16 @@ import java.io.FileInputStream
 import java.io.File
 import java.io.InputStream
 
-class ParserTest(inputstream: InputStream) extends Parser(inputstream) {
+object ParserTest {
+  def apply(inputstream: InputStream) = {
+    new ParserTest(inputstream, new EmptyCategorizer, 0)
+  }
+  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A) = {
+    new ParserTest(inputstream, categorizer, 0)
+  }
+}
+
+class ParserTest[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
   /*
    * This class extends Parser and adds a few methods to inspect the internal state
    * so that we can write more specific test
@@ -55,7 +67,17 @@ class ParserTest(inputstream: InputStream) extends Parser(inputstream) {
   }
 }
 
-class ParserTestLite(inputstream: InputStream) extends Parser(inputstream) {
+object ParserTestLite {
+  def apply(inputstream: InputStream) = {
+    new ParserTestLite(inputstream, new EmptyCategorizer, 0)
+  }
+  def apply(inputstream: InputStream, steplimit: Int) = {
+    new ParserTestLite(inputstream, new EmptyCategorizer, steplimit)
+  }
+
+}
+
+class ParserTestLite(inputstream: InputStream, categorizer: EmptyCategorizer, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
   /*
    * This class extends Parser and add a few methods to inspect the internal state
    * so that we can write more specific test
@@ -84,6 +106,7 @@ class ParserSpec extends FlatSpec {
   val frag2 = this.getClass().getClassLoader().getResource("fragment2_no_header.wet.gz")
   val frag3 = this.getClass().getClassLoader().getResource("fragment3.wet.gz")
   val frag4 = this.getClass().getClassLoader().getResource("appended_zip_fragment_unexpected_eof.wet.gz")
+  val frag1_asthma = this.getClass().getClassLoader().getResource("fragment1_asthma_incomplete_last.wet.gz")
   val fileheadersonly = this.getClass().getClassLoader().getResource("file_headers_only.wet.gz")
   val headersonly = this.getClass().getClassLoader().getResource("file_and_wet_headers_only.wet.gz")
   val corruptinfo1 = this.getClass().getClassLoader().getResource("corrupt_warcinfo_1.wet.gz")
@@ -102,7 +125,7 @@ class ParserSpec extends FlatSpec {
   // Testing State 1
   "parser" should "be in state one after initial header read" in 
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     assert(parser.getParserState() == "S1")
@@ -110,7 +133,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "be in state two after seven calls to run using frag3" in 
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     for (i <- 0 to 6) {
@@ -122,7 +145,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "have complete WARCInfo headers but no content after seven calls to run with frag3" in 
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     for (i <- 0 to 5) {
@@ -134,7 +157,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "know there are 259 bytes of content to read after info headers are complete in frag3" in
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     while (parser.getParserState() == "S1") {
@@ -146,7 +169,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "have a complete WARCInfo record after a run call while in State S2 with frag3 file" in
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     // This will get the headers and progress to S2
@@ -163,7 +186,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "move to state S3 after getting a complete WARCInfo record" in
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     // This will get the headers and progress to S2
@@ -178,7 +201,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "have complete WARCConversion headers upon transition to state S4" in
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     while (parser.getParserState() != "S4" && parser.getParserState() != "Sink1") {
@@ -191,7 +214,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "know there are 2287 bytes of content in first WARCConversion record of frag3" in 
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
 
     while (parser.getParserState() != "S4" && parser.getParserState() != "Sink1") {
@@ -204,7 +227,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "have a complete WARCConversion record upon transition to state S5" in
   {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
     parser.setDebug()
     val stopstates = List[String]("S5","Sink1","Final")
@@ -219,7 +242,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "extract 5 WARC conversion records from fragment3.wet.gz" in
   {
-    val parser = new Parser(new BufferedInputStream(
+    val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
     parser.setDebug()
     var records = ListBuffer[WARCRecord]()
@@ -230,7 +253,7 @@ class ParserSpec extends FlatSpec {
 
   "parser" should "end in the Final state after extracting all records from fragment3.wet.gz" in
   {
-    val parser = new ParserTestLite(new BufferedInputStream(
+    val parser = ParserTestLite(new BufferedInputStream(
       new FileInputStream(new File(frag3.getFile()))))
     parser.setDebug()
     var records = ListBuffer[WARCRecord]()
@@ -244,7 +267,7 @@ class ParserSpec extends FlatSpec {
    */
 
   "parser" should "bail to error Sink1 if unable to get a complete warcinfo header in a predetermined number of tries" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(corruptinfo1.getFile()))))
     parser.setDebug()
 
@@ -263,7 +286,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "bail to error Sink1 if the initial WARC record is not of type 'warcinfo'" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
     parser.setDebug()
 
@@ -280,7 +303,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "bail to error Sink1 if unable to get a complete warcinfo header in a predetermined number of tries because no warcinfo record exists" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(frag2.getFile()))))
     parser.setDebug()
 
@@ -299,7 +322,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "move to scan for additional WARC conversion records if unable to get a complete set of WARC conversion headers in a predefined number of tries" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(corruptconversion1.getFile()))))
     parser.setDebug()
 
@@ -336,7 +359,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "find an additional WARC conversion record if unable to get a complete set of WARC conversion headers in a previous record" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(corruptconversion1.getFile()))))
     parser.setDebug()
 
@@ -380,7 +403,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "end in an error state (Sink2) if no complete conversion records can be found after a corrupt record is detected" in {
-    val parser = new ParserTest(new BufferedInputStream(
+    val parser = ParserTest(new BufferedInputStream(
       new FileInputStream(new File(corruptconversion2.getFile()))))
     parser.setDebug()
 
@@ -412,8 +435,14 @@ class ParserSpec extends FlatSpec {
     assert(parser.getParserState == "Sink2") // we should end up in the error state
   }
 
+  "parser" should "stop when it reaches the error state (Sink2) when no complete conversion records can be found after a corrupt record is detected" in {
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(corruptconversion2.getFile()))), 1000)
+    assert(parser.getParserState == "Sink2")
+  }
+
   "parser" should "skip any non-conversion type records after the 'warcinfo' type record is parsed" in {
-    val parser = new Parser(new BufferedInputStream(
+    val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(corruptunexpectedinfo.getFile()))))
     parser.setDebug()
     var records = ListBuffer[WARCRecord]()
@@ -428,13 +457,27 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "return 4 WARCRecord objects skipping corrupt record in file corruptconversion1" in {
-    val parser = new Parser(new BufferedInputStream(
+    val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(corruptconversion1.getFile()))))
     parser.setDebug()
     var records = ListBuffer[WARCRecord]()
 
     parser.foreach((wc: WARCRecord) => records += wc)
     assert(records.size == 4)
+  }
+
+  "parser" should "accept a categorizer to use when parsing records" in {
+    val c: MyWARCCategorizer = new MyWARCCategorizer()
+    c.setMinMentions(4)
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+    val cat = records(0).getCategories() match {
+      case Some(a) => a
+      case _ => Set[String]()
+    }
+    assert(cat.contains("asthma"))
   }
 
   /*
