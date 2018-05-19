@@ -477,6 +477,7 @@ class ParserSpec extends FlatSpec {
       case Some(a) => a
       case _ => Set[String]()
     }
+    println(records(0).getCategories())
     assert(cat.contains("asthma"))
   }
 

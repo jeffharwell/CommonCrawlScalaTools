@@ -9,6 +9,7 @@
 *.swp
 CC-MAIN*.wet.gz
 CC-MAIN*.wet
+classifier_example_file.wet.gz
 application.conf
 wetpath_loader/target/
 wetpath_loader/bin/
