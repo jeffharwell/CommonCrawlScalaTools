@@ -7,18 +7,11 @@ package com.jeffharwell.commoncrawl.createcorpus
  */
 class EmptyCategorizer() extends WARCCategorizer {
   val emptyset = Set[String]()
-  def hasCategories(): Boolean = {
+  def hasCategories(s: String): Boolean = {
     false
   }
-  def getCategories(): Set[String] = {
+  def getCategories(s: String): Set[String] = {
     emptyset
-  }
-  def categorize(s: String): WARCCategorizer = {
-    // doesn't do anything and returns itself
-    // remember that Scala the last expression is taken 
-    // as the value that is returned.
-    // https://tpolecat.github.io/2014/05/09/return.html
-    this
   }
 }
 

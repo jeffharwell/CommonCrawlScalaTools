@@ -6,17 +6,19 @@ package com.jeffharwell.commoncrawl.createcorpus
  * Defines an interface (Java speak) that must be implemented by all WARC Categorizers
  */
 trait WARCCategorizer extends java.io.Serializable {
-  def hasCategories(): Boolean
-
-  def getCategories(): Set[String]
-
   /*
-   * This method operates on shared state (boo?) to categorize the string passed to it.
-   * It will set hascategories = true if any categories are found. It will also set 
-   * categories = List[String]('my','list','of','matching','categories')
+   * This method returns true or false depending on if the string s
+   * is categorized by the categorizer.
    *
    * @param s The string of content to categorize
-   * @return WARCCategorizer so that you can chain it c.categorize("mystring").getCategories.size
    */
-  def categorize(s: String): WARCCategorizer
+  def hasCategories(s: String): Boolean
+
+  /*
+   * This method returns a set containing each category that the string s
+   * matches
+   *
+   * @param s The string of content to categorize
+   */
+  def getCategories(s: String): Set[String]
 }

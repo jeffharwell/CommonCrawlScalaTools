@@ -13,12 +13,14 @@ import scala.collection.mutable.ListBuffer
  * The basic idea is that I am looking for keywords that, one, occur a certain number of
  * times and, two, occur in sentences of certain size.
  *
- * This filter is just the first cut, sentence parsing and relational tuple extraction 
- * come next, so it is more important that this filter be fast than that it be accurate.
- * I expect it to need to filter around 1 billion documents and extract the .1% that are
- * actually interesting for my research.
+ * @param minimummentions The minimum number of times a keyword must appear before the 
+ *                        content matches the category. This will default to 7.
  */
-class MyWARCCategorizer extends WARCCategorizer {
+class MyWARCCategorizer(minimummentions: Int) extends WARCCategorizer {
+
+  // Auxilary constructor that sets the minimum number of mentions to 7
+  // if no minimum is specified.
+  def this() = this(7)
 
   val keywords = Map[String, String](
     "trump" -> "politics",
@@ -27,50 +29,32 @@ class MyWARCCategorizer extends WARCCategorizer {
     "asthma" -> "asthma"
   )
 
-  // Does this content have any categories, default to no
-  private var hascategories = false
-
-  def hasCategories(): Boolean = {
-    return hascategories
+  /*
+   * Returns a boolean if the string s matches any categories.
+   *
+   * @param s The string to categorize
+   */
+  def hasCategories(s: String): Boolean = {
+    var categories = categorizeString(s, minimummentions, keywords)
+    if (categories.size > 0) {
+      true
+    } else {
+      false
+    }
   }
 
-  // The categories
-  var categories = List[String]()
-
-  def getCategories(): Set[String] = {
-    return categories.toSet
-  }
-
-  // controls how many times a keyword must be mentioned in the 
-  // content before it is considered a match. Defaults to 7.
-  var minimummentions = 7
-
-  // Setter for Minimum Mentions
-  def setMinMentions(i :Int): Unit = {
-    minimummentions = i
+  /*
+   * Returns a set of categories that the string s matches
+   *
+   * @param s The string to categorize
+   */
+  def getCategories(s: String): Set[String] = {
+    categorizeString(s, minimummentions, keywords).toSet
   }
 
   // Getter for Minimum Mentions
   def getMinMentions(): Int = {
     return(minimummentions)
-  }
-
-  /*
-   * This method operates on shared state (boo?) to categorize the string passed to it.
-   * It will set hascategories = true if any categories are found. It will also set 
-   * categories = List[String]('my','list','of','matching','categories')
-   *
-   * @param s The string of content to categorize
-   * @return WARCCategorizer so that you can chain it c.categorize("mystring").getCategories.size
-   */
-  def categorize(s: String): WARCCategorizer = {
-    categories = categorizeString(s, minimummentions, keywords)
-    if (categories.size > 0) {
-      hascategories = true
-    } else {
-      hascategories = false
-    }
-    return this
   }
 
   /*

@@ -12,24 +12,22 @@ class MyWARCCategorizerSpec extends FlatSpec {
 
   "MyWARCCategorizer" should "categorizer a paragraph that only mentions the keyword once with minmentions = 1" in
   {
-    val c = new MyWARCCategorizer()
-    c.setMinMentions(1)
-    assert(c.categorize(testcontent1).getCategories.size > 0)
+    val c = new MyWARCCategorizer(1)
+    assert(c.getCategories(testcontent1).size > 0)
+
   }
 
   "MyWARCCategorizer" should "categorizer testcontent1 as asthma when minmentions = 1" in
   {
-    val c = new MyWARCCategorizer()
-    c.setMinMentions(1)
-    c.categorize(testcontent1).getCategories == Set("asthma")
+    val c = new MyWARCCategorizer(1)
+    assert(c.getCategories(testcontent1) == Set("asthma"))
   }
 
 
   "MyWARCCategorizer" should "not categorizer a paragraph that only mentions the keyword once with minmentions = 2" in
   {
-    val c = new MyWARCCategorizer()
-    c.setMinMentions(2)
-    assert(!c.categorize(testcontent1).hasCategories)
+    val c = new MyWARCCategorizer(2)
+    assert(!c.hasCategories(testcontent1))
   }
 
 /*

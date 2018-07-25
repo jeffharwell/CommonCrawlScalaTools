@@ -92,8 +92,7 @@ object CountLocalFiltered {
       myfilter.setMinMentions(1)
 
       // Create the categorizer
-      val c: MyWARCCategorizer = new MyWARCCategorizer()
-      c.setMinMentions(1)
+      val c: MyWARCCategorizer = new MyWARCCategorizer(1)
 
       // Create the parser
       val parser = Parser(new BufferedInputStream(new FileInputStream(f)), c)
@@ -160,10 +159,9 @@ object CountLocalFiltered {
         println(myfilter(r))
         println(r.getCategories())
         r.getContent() match {
-          case Some(content) => c.categorize(content)
-          case _ => c.categorize("")
+          case Some(content) => println(c.getCategories(content))
+          case _ => println(c.getCategories(""))
         }
-        println(c.getCategories())
       })
 
 
@@ -253,8 +251,7 @@ object CountLocalFiltered {
         var url = new URL(urlbase+filepath)
 
         // Create the categorizer
-        val c: MyWARCCategorizer = new MyWARCCategorizer()
-        c.setMinMentions(2)
+        val c: MyWARCCategorizer = new MyWARCCategorizer(2)
 
         // Create the Filter
         val myfilter = new MyWARCFilter()

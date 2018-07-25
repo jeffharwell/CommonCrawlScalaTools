@@ -467,8 +467,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "accept a categorizer to use when parsing records" in {
-    val c: MyWARCCategorizer = new MyWARCCategorizer()
-    c.setMinMentions(4)
+    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
     var records = ListBuffer[WARCRecord]()

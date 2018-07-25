@@ -16,25 +16,6 @@ object WARCConversion {
    */
   def apply(): WARCConversion = {
     // Define the absolute minimum WARCCategorizer, it doesn't do anything
-    /*
-    class EmptyCategorizer() extends WARCCategorizer {
-      val emptyset = Set[String]()
-      def hasCategories(): Boolean = {
-        false
-      }
-      def getCategories(): Set[String] = {
-        emptyset
-      }
-      def categorize(s: String): WARCCategorizer = {
-        // doesn't do anything and returns itself
-        // remember that Scala the last expression is taken 
-        // as the value that is returned.
-        // https://tpolecat.github.io/2014/05/09/return.html
-        this
-      }
-    }
-    */
-
     new WARCConversion(new EmptyCategorizer)
   } 
 
@@ -52,14 +33,13 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
 
   val categorizer = acategorizer
 
-  // Our implementation of the WARCCategorizer, just wrap the categorizer that we were passed
-  // this feels a bit boilerplate'ie but I want to be able to treat the WARCRecord as a 
-  // categorizer itself.
+  // Wrap the WARCCategorizer, use the contents of the content field
   def hasCategories(): Boolean = {
-    categorizer.hasCategories()
-  }
-  def categorize(s: String): WARCCategorizer = {
-    categorizer.categorize(s)
+    if (fields.contains("Content")) {
+      categorizer.hasCategories(fields("Content"))
+    } else {
+      false
+    }
   }
 
   override val requiredfields: List[String] = List[String](
@@ -81,10 +61,14 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
    * @return a Option[Set[String]]
    */
   override def getCategories(): Option[Set[String]] = {
-    // Wrapping this in makes it consistent with the way that the .get("field")
+    // Wrapping this in Some makes it consistent with the way that the .get("field")
     // method works. Also makes it explicit when there is actually not categories
     // ,Option(None), vs the record doesn't match any categories, Option(Set())
-    Some(categorizer.getCategories())
+    if (fields.contains("Content")) {
+      Some(categorizer.getCategories(fields("Content")))
+    } else {
+      None
+    }
   }
 
   /*
@@ -167,7 +151,7 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
    */
   override def addContent(cs: String): Unit = {
     fields += "Content" -> cs
-    categorize(cs)
+    //categorize(cs)
   }
 
 

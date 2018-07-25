@@ -195,8 +195,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val c: MyWARCCategorizer = new MyWARCCategorizer()
-    c.setMinMentions(4)
+    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
     val w: WARCConversion = WARCConversion(c)
 
     val content = "Asthma asthma asthma this should match the asthma category."
@@ -225,8 +224,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val c: MyWARCCategorizer = new MyWARCCategorizer()
-    c.setMinMentions(4)
+    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
     val w: WARCConversion = WARCConversion(c)
 
     val content = "Asthma trump asthma trump asthma trump this should match the asthma and trump politics category."
@@ -260,8 +258,7 @@ class WARCConversionSpec extends FlatSpec {
     winfo.addFields(warcinforequired)
     winfo.addContent("This is my content") 
  
-    val c: MyWARCCategorizer = new MyWARCCategorizer()
-    c.setMinMentions(4)
+    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
     val w: WARCConversion = WARCConversion(c)
 
     val content = "This sentence should not match any content categories."
