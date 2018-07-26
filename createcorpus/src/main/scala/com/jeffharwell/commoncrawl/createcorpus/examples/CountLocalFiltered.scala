@@ -156,11 +156,11 @@ object CountLocalFiltered {
         var content_size = contentsize(r.getContent())
 
         println(s"WARC Record: ${r.get("WARC-Record-ID")} $content_size, a's and e's $num_a")
-        println(myfilter(r))
-        println(r.getCategories())
+        println(s"Contains any of the filter keywords: ${myfilter(r)}")
+        print("Document matches the following categories: ")
         r.getContent() match {
           case Some(content) => println(c.getCategories(content))
-          case _ => println(c.getCategories(""))
+          case _ => println("None")
         }
       })
 
@@ -206,10 +206,11 @@ object CountLocalFiltered {
 
     def example4 = {
       //val input = scala.io.StdIn.readLine() // for Scala 2.11 and greater
-      var input = readLine("Do you want to parse a file straight from AWS? (y/N): ")
+      var input = readLine("The next example requires parsing a file directly from AWS. Do you want to continue? (y/N): ")
       if (input != "y") {
-        println("Done with example 3")
+        println("Done with example 4")
       } else {
+        println("Reading and filtering a compressed WET archive straight from the web.")
         // This is the path from the wet.paths file
         var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698540409.8/wet/CC-MAIN-20161202170900-00007-ip-10-31-129-80.ec2.internal.warc.wet.gz"
         val urlbase = "https://commoncrawl.s3.amazonaws.com/"
@@ -241,21 +242,21 @@ object CountLocalFiltered {
    * Read and classify a compressed WET archive from the web.
    */
     def example5 = {
-      val input = readLine("Do you want to parse a file straight from AWS? (y/N): ")
+      val input = readLine("The next example requires parsing a file directly from AWS. Do you want to continue? (y/N): ")
       if (input != "y") {
-        println("Done with example 4")
+        println("Done with example 5")
       } else {
+        println("Reading and classify a compressed WET archive from the web.")
         // This is the path from the wet.paths file
         var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698540409.8/wet/CC-MAIN-20161202170900-00007-ip-10-31-129-80.ec2.internal.warc.wet.gz"
         val urlbase = "https://commoncrawl.s3.amazonaws.com/"
         var url = new URL(urlbase+filepath)
 
         // Create the categorizer
-        val c: MyWARCCategorizer = new MyWARCCategorizer(2)
+        val c: MyWARCCategorizer = new MyWARCCategorizer(1)
 
         // Create the Filter
         val myfilter = new MyWARCFilter()
-
 
         // Create the parser
         val parser_from_aws_2 = Parser(new BufferedInputStream(url.openStream()), c)
@@ -264,6 +265,10 @@ object CountLocalFiltered {
 
         parser_from_aws_2.withFilter(myfilter(_)).foreach((wc: WARCRecord) => records_from_aws += wc)
 
+        // Now grab all the documents where the content mentions asthma at all
+        // using a simple filter and the contains method.
+        // Essentially this pulls out all the asthma content, as MyWARCFilter
+        // matched both asthma and politics content
         def mycontentfilter(content: Option[String]): Boolean = {
             content match {
                 case Some(c) => c.contains("asthma")
@@ -271,12 +276,68 @@ object CountLocalFiltered {
             }
         }
         val l = records_from_aws.filter(y => mycontentfilter(y.getContent()))
-        l.foreach(y => println(y.getCategories()))
+
+        // Dump the categories for each document that matched the simple filter
+        l.foreach(y => {
+            print(s"WARC Record: ${y.get("WARC-Record-ID")} ")
+            y.getCategories() match {
+              case Some(categoryset) => println(s"matches these categories: ${categoryset}.")
+              case _ => println("does not match any categories.")
+            }
+          }
+        )
       }
 
     }
 
     example5
+
+  /*
+   * Example 6:
+   *
+   * Read and classify a compressed WET archive from the web.
+   */
+    def example6 = {
+        val frag1_asthma = this.getClass().getClassLoader().getResource("filter_test_1.wet.gz")
+
+        // Create the categorizer
+        val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+
+        // Create the Filter
+        val myfilter = new MyWARCFilter()
+
+        // Create the parser
+        val parser6 = Parser(new BufferedInputStream(
+          new FileInputStream(new File(frag1_asthma.getFile()))), c)
+
+        val records = new ListBuffer[WARCRecord]()
+
+        parser6.withFilter(myfilter(_)).foreach((wc: WARCRecord) => records += wc)
+
+        // Now grab all the documents where the content mentions asthma at all
+        // using a simple filter and the contains method.
+        // Essentially this pulls out all the asthma content, as MyWARCFilter
+        // matched both asthma and politics content
+        def mycontentfilter(content: Option[String]): Boolean = {
+            content match {
+                case Some(c) => c.contains("asthma")
+                case _ => false
+            }
+        }
+        val l = records.filter(y => mycontentfilter(y.getContent()))
+
+        // Dump the categories for each document that matched the simple filter
+        l.foreach(y => {
+            print(s"WARC Record: ${y.get("WARC-Record-ID")} ")
+            y.getCategories() match {
+              case Some(categoryset) => println(s"matches these categories: ${categoryset}.")
+              case _ => println("does not match any categories.")
+            }
+          }
+        )
+    }
+
+    example6
 
   } // end main
 

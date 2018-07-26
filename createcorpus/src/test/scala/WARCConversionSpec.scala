@@ -278,7 +278,7 @@ class WARCConversionSpec extends FlatSpec {
     w.addContent(content)
 
     assert(!w.hasCategories)
-    assert(w.getCategories.get.size == 0)
+    w.getCategories() should be (None)
   }
 
   "WARCConversion" should "should not categorize this content with default categorizer" in {
@@ -306,7 +306,7 @@ class WARCConversionSpec extends FlatSpec {
     w.addContent(content)
 
     assert(!w.hasCategories)
-    assert(w.getCategories.get.size == 0)
+    w.getCategories() should be (None)
   }
 
 

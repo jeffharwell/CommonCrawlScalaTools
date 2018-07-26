@@ -107,6 +107,7 @@ class ParserSpec extends FlatSpec {
   val frag3 = this.getClass().getClassLoader().getResource("fragment3.wet.gz")
   val frag4 = this.getClass().getClassLoader().getResource("appended_zip_fragment_unexpected_eof.wet.gz")
   val frag1_asthma = this.getClass().getClassLoader().getResource("fragment1_asthma_incomplete_last.wet.gz")
+  val filter_test_1 = this.getClass().getClassLoader().getResource("filter_test_1.wet.gz")
   val fileheadersonly = this.getClass().getClassLoader().getResource("file_headers_only.wet.gz")
   val headersonly = this.getClass().getClassLoader().getResource("file_and_wet_headers_only.wet.gz")
   val corruptinfo1 = this.getClass().getClassLoader().getResource("corrupt_warcinfo_1.wet.gz")
@@ -478,6 +479,40 @@ class ParserSpec extends FlatSpec {
     }
     println(records(0).getCategories())
     assert(cat.contains("asthma"))
+  }
+
+  "parser" should "apply the categorizer to multiple records" in {
+    val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+    //val parser = Parser(new BufferedInputStream(
+    //  new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), c, 100000)
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+	// Now grab all the documents where the content mentions asthma at all
+	// using a simple filter and the contains method.
+	// Essentially this pulls out all the asthma content, as MyWARCFilter
+	// matched both asthma and politics content
+	def mycontentfilter(content: Option[String]): Boolean = {
+		content match {
+			case Some(c) => c.contains("asthma")
+			case _ => false
+		}
+	}
+	val l = records.filter(y => mycontentfilter(y.getContent()))
+    println(l.size)
+
+    def getcat(record: WARCRecord) = { 
+        record.getCategories() match {
+        case Some(a) => a
+        case _ => Set[String]()
+      }
+    }
+
+    l.foreach((lr) => {
+      assert(getcat(lr).contains("asthma"))
+    })
   }
 
   /*

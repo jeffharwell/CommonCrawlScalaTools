@@ -65,7 +65,12 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
     // method works. Also makes it explicit when there is actually not categories
     // ,Option(None), vs the record doesn't match any categories, Option(Set())
     if (fields.contains("Content")) {
-      Some(categorizer.getCategories(fields("Content")))
+      var categories: Set[String] = categorizer.getCategories(fields("Content"))
+      if (categories.size > 0) {
+        Some(categories)
+      } else {
+        None
+      }
     } else {
       None
     }

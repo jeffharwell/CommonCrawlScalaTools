@@ -445,7 +445,8 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       if (debug) { statetrace += this }
 
       // create a new WARCConversion record
-      currentwarcconversion = WARCConversion()
+      currentwarcconversion = WARCConversion(categorizer)
+
       // Return state S3 which will start adding headers to the new record
       // that we just created.
       return(m(E9))
@@ -475,7 +476,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
         // alright, we might have found one, go to state 3 and try to parse it
         
         // create a new WARCConversion record
-        currentwarcconversion = WARCConversion()
+        currentwarcconversion = WARCConversion(categorizer)
 
         return(m(E9))
       } else {
