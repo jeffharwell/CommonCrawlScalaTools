@@ -76,16 +76,6 @@ class MyWARCCategorizer(minimummentions: Int) extends WARCCategorizer {
     }
 
     return matchbuffer.toList
-
-    // Now the more extensive check, if anything matched split the content
-    // into lines and make sure there is at least one match on a line where
-    // the wordcount is greater than 7 (I just made that number up) but less than 50
-    // (made that up too) because I want to filter out spam keyword stuffing.
-    //
-    // I could probably do something clever like have the ciMatch also return
-    // the indicies of the match in the content, then I split the content by ". " look at
-    // the starting and ending indices (have to screw with it a bit to account for 
-    // the missing ". ") and then count the words for the matching strings
   }
 
   /* ciMatch

@@ -101,7 +101,9 @@ object CountLocalFiltered {
       val records = new ListBuffer[WARCRecord]()
 
       // Apply the filter using withFilter
-      parser.withFilter(myfilter(_)).foreach((wc: WARCRecord) => records += wc)
+      parser.withFilter(myfilter(_)).foreach((wc: WARCRecord) => {
+          records += wc
+      })
       // Without the filter
       //parser.foreach((wc: WARCRecord) => records += wc)
 

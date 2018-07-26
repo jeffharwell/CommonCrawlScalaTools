@@ -23,6 +23,8 @@ object Parser {
   /*
    * When no arguments are supplied create a class that implements WARCCategorizer
    * and never categorizes anything and pass that to the constructor.
+   *
+   * @param inputstream a java.io.InputStream giving access to a gzipped WET archive
    */
   def apply(inputstream: InputStream): Parser[EmptyCategorizer] = {
     new Parser(inputstream, new EmptyCategorizer, 0)
@@ -30,6 +32,11 @@ object Parser {
 
   /* 
    * No categorizer passed, but do include a step limit
+   *
+   * @param inputstream a java.io.InputStream giving access to a gzipped WET archive
+   * @param steplimit Int that put an upper limit on the number of steps/transitions the
+   *                  Parser FSA will make before returning with a RuntimeException. Useful
+   *                  to protect against infinite loops during testing.
    */
   def apply(inputstream: InputStream, steplimit: Int): Parser[EmptyCategorizer] = {
     new Parser(inputstream, new EmptyCategorizer, steplimit)
@@ -37,6 +44,11 @@ object Parser {
 
   /*
    * If a categorizer is passed then use it
+   *
+   * @param inputstream a java.io.InputStream giving access to a gzipped WET archive
+   * @param categorizer A class the inherits from WARCCategorizer that is used to categorize
+   *                    the WARC record. The parser simply passes this to the WARCConversion
+   *                    object when it initializes it.
    */
   def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A): Parser[A] = {
     new Parser(inputstream, categorizer, 0)
@@ -44,6 +56,14 @@ object Parser {
 
   /*
    * Categorizer and a steplimit
+   *
+   * @param inputstream a java.io.InputStream giving access to a gzipped WET archive
+   * @param categorizer A class the inherits from WARCCategorizer that is used to categorize
+   *                    the WARC record. The parser simply passes this to the WARCConversion
+   *                    object when it initializes it.
+   * @param steplimit Int that put an upper limit on the number of steps/transitions the
+   *                  Parser FSA will make before returning with a RuntimeException. Useful
+   *                  to protect against infinite loops during testing.
    */
   def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int): Parser[A] = {
     new Parser(inputstream, categorizer, steplimit)

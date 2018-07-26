@@ -86,7 +86,7 @@ class MyWARCFilter() extends IsAWARCFilter {
     val chunks = wrecord.fields("Content").split("\\n").foldLeft(List[String]()) { (x, t) => x ++ t.split("\\. ") }
 
     // This is a bit tricky,
-    // write a recursive function that checks each chunk to see if it is 
+    // A recursive function that checks each chunk to see if it is 
     // < 50 "words" but greater than 7 "words". If so check containsKeyword. If 
     // true then we are done, it passes the filter, if false then grab the next chunk.
     def checkChunks(chunks: List[String]): Boolean = {
