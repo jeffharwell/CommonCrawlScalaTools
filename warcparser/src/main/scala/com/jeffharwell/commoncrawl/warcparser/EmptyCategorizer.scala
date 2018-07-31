@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl.createcorpus
+package com.jeffharwell.commoncrawl.warcparser
 
 /*
  * This is a categorizer that never categorizes anything.

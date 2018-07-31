@@ -1,10 +1,10 @@
 import org.scalatest._
 import Matchers._
-import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
-import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
-import com.jeffharwell.commoncrawl.createcorpus.WARCRecordTypeException
-import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
-import com.jeffharwell.commoncrawl.createcorpus.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.WARCRecord
+import com.jeffharwell.commoncrawl.warcparser.WARCInfo
+import com.jeffharwell.commoncrawl.warcparser.WARCRecordTypeException
+import com.jeffharwell.commoncrawl.warcparser.WARCConversion
+import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
 //import scala.collection.mutable.Map
 
 class WARCConversionSpec extends FlatSpec {

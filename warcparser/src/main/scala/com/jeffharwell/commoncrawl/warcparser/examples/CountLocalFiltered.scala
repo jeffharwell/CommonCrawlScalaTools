@@ -1,10 +1,10 @@
-package com.jeffharwell.commoncrawl.createcorpus.examples
+package com.jeffharwell.commoncrawl.warcparser.examples
 
 /* Common Crawl Classes */
-import com.jeffharwell.commoncrawl.createcorpus.Parser
-import com.jeffharwell.commoncrawl.createcorpus.WARCRecord
-import com.jeffharwell.commoncrawl.createcorpus.MyWARCFilter
-import com.jeffharwell.commoncrawl.createcorpus.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.Parser
+import com.jeffharwell.commoncrawl.warcparser.WARCRecord
+import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
 
 /* Other Classes */
 import scala.collection.mutable.ListBuffer

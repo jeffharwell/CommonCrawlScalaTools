@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl.createcorpus
+package com.jeffharwell.commoncrawl.warcparser
 
 // The Parser won't accept a filter that doesn't 
 // extend the IsAWARCFilter trait

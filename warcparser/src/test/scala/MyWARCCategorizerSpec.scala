@@ -1,78 +1,34 @@
 import org.scalatest._
-import com.jeffharwell.commoncrawl.createcorpus.Parser
-import com.jeffharwell.commoncrawl.createcorpus.WARCConversion
-import com.jeffharwell.commoncrawl.createcorpus.WARCInfo
-import com.jeffharwell.commoncrawl.createcorpus.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.Parser
+import com.jeffharwell.commoncrawl.warcparser.WARCConversion
+import com.jeffharwell.commoncrawl.warcparser.WARCInfo
+import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
 
-class MyWARCFilterSpec extends FlatSpec {
-
-  // Utility class to create a dummy WARCConversion record out of our content string
-  // so that we can pass it to the filter for testing.
-  def createDummyWARCRecordWithContent(content: String): WARCConversion = {
-    // Create the dummy WARCInfo object first
-    val warcinforequired = Map[String,String](
-       "WARC-Type" -> "warcinfo"
-      ,"WARC-Date" -> "2016-12-13T03:22:59Z"
-      ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
-      ,"WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>"
-      ,"Content-Type" -> "application/warc-fields"
-      ,"Content-Length" -> "This is my content".getBytes("UTF-8").size.toString()
-    )
-
-    val winfo = new WARCInfo()
-    winfo.addFields(warcinforequired)
-    winfo.addContent("This is my content") 
-
-    // Now create the WARCConversion object
-    val requiredfields: Map[String,String] = Map[String,String](
-      "WARC-Type" -> "conversion",
-      "WARC-Target-URI" -> "https://not.a.real.site.com/",
-      "WARC-Date" -> "2016-12-13T03:22:59Z",
-      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
-      "WARC-Refers-To" -> "DummyRefersToContent",
-      "WARC-Block-Digest" -> "DummyDigest",
-      "Content-Type" -> "text"
-    )
-
-    val w = WARCConversion()
-    w.addWARCInfo(winfo)
-    w.addFields(requiredfields)
-    w.addFields(Map[String,String]("Content-Length" -> content.getBytes("UTF-8").size.toString()))
-    w.addContent(content)
-    return w
-  }
+class MyWARCCategorizerSpec extends FlatSpec {
 
  /*
  * Unit Tests
  */
 
-  "MyWARCFilter" should "accept a paragraph that only mentions the keyword once with minmentions = 1" in
+  "MyWARCCategorizer" should "categorizer a paragraph that only mentions the keyword once with minmentions = 1" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val f = new MyWARCFilter()
-    f.setMinMentions(1)
+    val c = new MyWARCCategorizer(1)
+    assert(c.getCategories(testcontent1).size > 0)
 
-    assert(f(crtest1))
   }
 
-  "MyWARCFilter" should "reject a paragraph that only mentions the keyword once with minmentions = 2" in
+  "MyWARCCategorizer" should "categorizer testcontent1 as asthma when minmentions = 1" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val f = new MyWARCFilter()
-    f.setMinMentions(2)
-
-    assert(!f(crtest1))
+    val c = new MyWARCCategorizer(1)
+    assert(c.getCategories(testcontent1) == Set("asthma"))
   }
 
-  "MyWARCFilter" should "reject text when the keyword only appears in its own line" in
+
+  "MyWARCCategorizer" should "not categorizer a paragraph that only mentions the keyword once with minmentions = 2" in
   {
-    val crtest1 = createDummyWARCRecordWithContent(taglist)
-    val f = new MyWARCFilter()
-    f.setMinMentions(1)
-
-    assert(!f(crtest1))
+    val c = new MyWARCCategorizer(2)
+    assert(!c.hasCategories(testcontent1))
   }
-
 
 /*
  * Here is the sample data used to test filter. It consists of a few samples
@@ -82,7 +38,7 @@ class MyWARCFilterSpec extends FlatSpec {
  * You can also find the complete WARC records in the resource file filter_test_1.wet.gz
  *
  * One of the nastiest problems with this content is how to divide sentences. I 
- * tried to grab sample content that illustrates this problem
+ * tried to grab sample content the illustrates this problem
  *
  * Wanting to accept the text from mixperiodandcarriagereturn, but reject the text
  * from asthmaweather while also rejecting the text from keywordstuffing illustrates 

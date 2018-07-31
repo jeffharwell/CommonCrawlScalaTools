@@ -2,7 +2,7 @@
 
 SCALAVERSION="2.10"
 VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
-NAME="createcorpus"
+NAME="WARCParser"
 ORGANIZATION="com.jeffharwell"
 K8SCRIPTBASE="~/nginx_jar_repo"
 

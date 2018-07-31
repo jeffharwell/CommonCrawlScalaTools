@@ -1,7 +1,7 @@
 import collection.mutable.Stack
 import scala.collection.immutable.Map
 import org.scalatest._
-import com.jeffharwell.commoncrawl.createcorpus.Reader
+import com.jeffharwell.commoncrawl.warcparser.Reader
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.File

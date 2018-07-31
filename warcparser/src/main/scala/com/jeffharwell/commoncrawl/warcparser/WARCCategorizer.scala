@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl.createcorpus
+package com.jeffharwell.commoncrawl.warcparser
 
 /*
  * The WARC Categorizer Trait

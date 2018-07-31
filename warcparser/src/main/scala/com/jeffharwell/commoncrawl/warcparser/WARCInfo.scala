@@ -1,4 +1,4 @@
-package com.jeffharwell.commoncrawl.createcorpus
+package com.jeffharwell.commoncrawl.warcparser
 
 // Allows you to say var wi = WARCInfo() and get your object back
 // this make it consistent with the usage of WARCConversion which has

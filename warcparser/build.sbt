@@ -1,8 +1,8 @@
 organization := "com.jeffharwell"
 
-name := "CreateCorpus"
+name := "WARCParser"
 
-version := "0.0.5"
+version := "0.0.6"
 publishMavenStyle := true
 
 //scalaVersion := "2.12.0"
