@@ -2,18 +2,18 @@
 
 SCALAVERSION="2.10"
 VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
-NAME="WARCParser"
+NAME="warcparser"
 ORGANIZATION="com.jeffharwell"
 K8SCRIPTBASE="~/nginx_jar_repo"
 
 K8USER="k8"
 K8HOST="k8master.fuller.edu"
 
-MVNLOCAL="/home/jharwell/.m2/com/jeffharwell/${NAME}_${SCALAVERSION}"
+MVNLOCAL="/home/jharwell/.m2/repository/com/jeffharwell/${NAME}_${SCALAVERSION}"
 
 sbt package
 
-mvn install:install-file -Dfile=./target/scala-${SCALAVERSION}/${NAME}_${SCALAVERSION}-${VERSION}.jar -DgroupId=${ORGANIZATION} -DartifactId=${NAME}_${SCALAVERSION} -Dversion=${VERSION} -Dpackaging=jar -DlocalRepositoryPath=/home/jharwell/.m2 -DcreateChecksum=true
+mvn install:install-file -Dfile=./target/scala-${SCALAVERSION}/${NAME}_${SCALAVERSION}-${VERSION}.jar -DgroupId=${ORGANIZATION} -DartifactId=${NAME}_${SCALAVERSION} -Dversion=${VERSION} -Dpackaging=jar -DlocalRepositoryPath=/home/jharwell/.m2/repository -DcreateChecksum=true
 
 for i in "xml" "xml.sha1" "xml.md5"
 do
