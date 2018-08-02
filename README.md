@@ -2,43 +2,49 @@
 
 This is my collection of tools to manipulate Common Crawl data using Scala.
 
-### Create a Corpus from WET Archives
+### The Sample WARC Parser code
 
 To run the example code
 
-    $ cd ./createcorpus
+First get the repo and compile the code
+
+    $ git clone https://github.com/jeffharwell/CommonCrawlScalaTools.git
+    $ cd ./CommonCrawlScalaTools/warcparser
+    $ sbt clean compile test
+
     $ sbt
-    > runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered
+    > runMain com.jeffharwell.commoncrawl.warcparser.examples.CountLocalFiltered
 
 or 
 
-    cd ./createcorpus
-    sbt "runMain com.jeffharwell.commoncrawl.createcorpus.examples.CountLocalFiltered"
+    cd ./warcparser
+    sbt "runMain com.jeffharwell.commoncrawl.warcparser.examples.CountLocalFiltered"
 
-### wetpath_loader ###
+### Submitting The Hello App to Spark
 
-This is my tool for reading the list of WET paths published by Common Crawl and loading them into a database table. To run:
+This is a bit of a placeholder. The createcorpus library is set up to create an application
+that can be packaged into a "fat jar" by sbt-assembly and then submitted directly to a Spark
+cluster. The library has a dependency on the warcparser so you must first compile and publish
+that code locally before you can compile and submit the createcorpus code.
 
-clone the repo
+Here are the instructions on how to run the full process from compile to submission. Note: you
+will want to modify the ./createcorpus/sample_spark_submit.sh script so that it points to your Spark cluster.
 
-> git clone https://github.com/jeffharwell/CommonCrawlScalaTools.git
+First you need to make sure that the warcparser code has been published locally
 
-Create a database with a table wetpaths that follows the schema in the database_schema.sql file in the root of this project. This file has the commands to create a database, create a user, and create the table, and grant permissions in a Mysql database.
+    $ cd ./warcparser
+    $ sbt clean compile publishLocal
 
-Go to the wetpath_loader sbt project
+The above command should have published the .jar file containing the warcparser libray to your local
+.ivy2 directory. Now compile and assemble the createcorpus libary. The 'assembly' sbt task will create a 
+jar file that also includes the warcparser code that you just compiled and published. This is important because
+you can't depend on the remote Spark instance to have the warcparser library available so you must include it
+in your submission.
 
-> cd ./wetpath_loader
+    $ cd ../createcorpus
+    $ sbt clean compile assembly
 
-Copy the application.conf.example file to application.conf and edit the file to add the username, password and hostname of the computer hosting your database. You can also change the driver and url if you opt not to use MySql.
+The code includes a sample script that uses the spark-submit program to submit the jar you just assembled to a 
+Spark cluster. It assumes that you can the Spark binary installed in the following path: ${HOME}/bin/spark/spark-1.6.3-bin-hadoop2.6/. You will need to modify this script and tell it the URL of your spark cluster.
 
-You will also need to provide the path of the file holding the list of WET Paths for the crawl you are working with. Common Crawl will provide this file for every crawl that they do. For example for the [December 2016 Crawl](http://commoncrawl.org/2016/12/december-2016-crawl-archive-now-available/) the WET file list is CC-MAIN-2016-50/wet.paths.gz. If you wanted to use it download it, unzip it, and drop it in the ./src/main/resources directory, then add the name of the file to application.conf as the value for general.wetpathfile.
-
-> cp ./src/main/resources/application.conf.example ./src/main/resources/application.conf
-> vi ./src/main/resources/application.conf
-
-Now fire up sbt and run the loader
-
-> $ sbt
-> > run 
-
-This will load the paths from the wet.paths file into the database table.
+    $ sh ./sample_spark_submit.sh

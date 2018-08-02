@@ -9,11 +9,12 @@ K8SCRIPTBASE="~/nginx_jar_repo"
 K8USER="k8"
 K8HOST="k8master.fuller.edu"
 
-MVNLOCAL="/home/jharwell/.m2/repository/com/jeffharwell/${NAME}_${SCALAVERSION}"
+LOCALMAVENREPO=${HOME}/.m2/repository
+MVNLOCAL="${HOME}/.m2/repository/com/jeffharwell/${NAME}_${SCALAVERSION}"
 
 sbt package
 
-mvn install:install-file -Dfile=./target/scala-${SCALAVERSION}/${NAME}_${SCALAVERSION}-${VERSION}.jar -DgroupId=${ORGANIZATION} -DartifactId=${NAME}_${SCALAVERSION} -Dversion=${VERSION} -Dpackaging=jar -DlocalRepositoryPath=/home/jharwell/.m2/repository -DcreateChecksum=true
+mvn install:install-file -Dfile=./target/scala-${SCALAVERSION}/${NAME}_${SCALAVERSION}-${VERSION}.jar -DgroupId=${ORGANIZATION} -DartifactId=${NAME}_${SCALAVERSION} -Dversion=${VERSION} -Dpackaging=jar -DlocalRepositoryPath=${LOCALMAVENREPO} -DcreateChecksum=true
 
 for i in "xml" "xml.sha1" "xml.md5"
 do
