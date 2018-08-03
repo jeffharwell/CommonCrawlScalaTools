@@ -17,7 +17,6 @@ First get the repo and compile the code
 
 or 
 
-    cd ./warcparser
     sbt "runMain com.jeffharwell.commoncrawl.warcparser.examples.CountLocalFiltered"
 
 ### Submitting The Hello App to Spark

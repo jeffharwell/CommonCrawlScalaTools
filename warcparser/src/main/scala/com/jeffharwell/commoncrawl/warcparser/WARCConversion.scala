@@ -77,6 +77,28 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
   }
 
   /*
+   * Returns the value of an arbitrary field. We override the WARCRecord 
+   * method because we also want to return the fields from the WARCInfo object
+   * if we don't find a match in the fields within the WARCConversion object.
+   *
+   * @return an Option[String] that has the content if there is any
+   */
+  override def get(fieldname: String): Option[String] = {
+    if (fields.contains(fieldname)) {
+      // First check the fields directly contained by this object
+      Some(fields(fieldname))
+    } else {
+      // If we didn't find anything check the WARCInfo object if we
+      // have one.
+      requiredwarcinfo match {
+        case Some(x) => x.get(fieldname)
+        case _ => None
+      }
+    }
+  }
+
+
+  /*
    * Set the WARCInfo object that gives the context for this WARCConversion object
    *
    * There is probably a much better implementation than to,

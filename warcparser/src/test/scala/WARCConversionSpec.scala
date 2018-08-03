@@ -14,7 +14,7 @@ class WARCConversionSpec extends FlatSpec {
      "WARC-Type" -> "warcinfo"
     ,"WARC-Date" -> "2016-12-13T03:22:59Z"
     ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
-    ,"WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>"
+    ,"WARC-Record-ID" -> "<urn:uuid:600aac89-8012-4390-8be6-2d81979f88cc>"
     ,"Content-Type" -> "application/warc-fields"
     ,"Content-Length" -> "259")
 
@@ -57,6 +57,25 @@ class WARCConversionSpec extends FlatSpec {
     val w = WARCConversion()
 
     assertThrows[WARCRecordTypeException] { w.addFields(Map("WARC-Type" -> "warcinfo")) }
+  }
+  
+  "WARCConversion" should "be incomplete without a WARCInfo object" in {
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> "my content length")
+
+    w.addFields(requiredfields)
+    w.addContent("This is my content") 
+    
+    assert(w.isComplete() === false)
   }
 
   "WARCConversion" should "be complete with these fields and content" in {
@@ -160,6 +179,81 @@ class WARCConversionSpec extends FlatSpec {
     assert(w.get("WARC-Date") == Some("2016-12-13T03:22:59Z"))
     assert(w.get("WARC-Type") == Some("conversion"))
     assert(w.getContent() == Some("This is my WARCConversion content"))
+  }
+
+  "WARCConversion" should "should return the fields from WARCInfo using the get method" in {
+    // First create the WARCInfo we need
+    val winfo = new WARCInfo()
+    winfo.addFields(warcinforequired)
+    winfo.addContent("This is my content") 
+ 
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> "35")
+
+    w.addFields(requiredfields)
+    w.addContent("This is my WARCConversion content")
+    w.addWARCInfo(winfo)
+ 
+    // The WARC-Filename field is in the WARCInfo object, not directly in the wARCConversion object's fields.
+    assert(w.get("WARC-Filename") == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
+  }
+
+  "WARCConversion" should "should return None for non-existent field even in the absence of a WARCInfo object" in {
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> "35")
+
+    w.addFields(requiredfields)
+    w.addContent("This is my WARCConversion content")
+ 
+    // The WARC-Filename field is in the WARCInfo object, not directly in the wARCConversion object's fields.
+    w.get("WARC-Filename") should be (None)
+  }
+
+
+  "WARCConversion" should "Fields from WARCConversion should mask fields from WARCInfo if they have the same name" in {
+    // First create the WARCInfo we need
+    val winfo = new WARCInfo()
+    winfo.addFields(warcinforequired)
+    winfo.addContent("This is my content") 
+ 
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String,String] = Map[String,String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> "35")
+
+    w.addFields(requiredfields)
+    w.addContent("This is my WARCConversion content")
+    w.addWARCInfo(winfo)
+   
+    // The WARCConversion record has a WARC-Record-ID and so does the WARCInfo object that
+    // we passed. <urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb> is the WARC conversion ID
+    // while <urn:uuid:600aac89-8012-4390-8be6-2d81979f88cc> is the WARC info ID
+    assert(w.get("WARC-Record-ID") == Some("<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>"))
   }
 
 
