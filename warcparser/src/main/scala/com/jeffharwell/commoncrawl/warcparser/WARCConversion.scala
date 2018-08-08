@@ -1,5 +1,8 @@
 package com.jeffharwell.commoncrawl.warcparser
 
+import java.net.URL
+import java.net.MalformedURLException
+
 
 /*
  * WARCConversion Factory Companion Object
@@ -166,6 +169,18 @@ class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
       // Check to make sure we are receiving headers for the right kind of record
       if (k == "WARC-Type" && v != "conversion") {
         throw new WARCRecordTypeException(s"Expecting WARC-Type = conversion but found ${v} instead")
+      }
+      // If we just got a WARC-URI field the populate the top level domain field as well
+      if (k == "WARC-Target-URI") {
+        try {
+          var urlObj = new URL(v)
+          var tld = urlObj.getHost.split('.').last
+          fields += "Top-Level-Domain" -> tld
+        } catch {
+          // We don't care, if it fails just don't set anything
+          case invalidURL: java.net.MalformedURLException => 
+          case e: Exception => 
+        }
       }
     }
   }
