@@ -97,8 +97,83 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   var lasterror = "" // contains the last error, which is hopefully the reason
                      // we ended up in a given sink state
 
+  // Holder for the start and finish triggers if they get defined
+  var startTrigger: Option[ParserTrigger] = None : Option[ParserTrigger]
+  var finishTrigger: Option[ParserTrigger] = None : Option[ParserTrigger]
+
   // Initialize our reader
   val reader = new Reader(inputstream)
+
+  /*
+   * Functions for setting the Start and Finish Trigger
+   *
+   */
+
+  /*
+   * Add an object that the parser will call once it starts parsing a WARC archive.
+   *
+   * @param pt An object that inherits from ParseTrigger.
+   *
+   */
+  def addStartTrigger[A <: ParserTrigger](pt: A) = {
+    startTrigger = Some(pt)
+
+    // This is a bit tricky. The constructor for the Parser immediately instantiates
+    // an FSA and call privateNext() to parse the first record. This means that by the
+    // time you add a start trigger the Parser has already internally started parsing the
+    // file and has either errored out or already internally loaded the first record.
+    //
+    // So when this method is called we just immediately call the trigger.
+    callStartTrigger()
+  }
+
+  /*
+   * Add an object that the parser will call once it finishes parsing a WARC archive.
+   *
+   * @param pt An object that inherits from ParseTrigger.
+   *
+   */
+
+  def addFinishTrigger[A <: ParserTrigger](pt: A) = {
+    finishTrigger = Some(pt)
+
+    if (!hasnext) {
+      // Hmm we are adding a finish trigger but we are already done parsing
+      // this can happen in cases of a corrupt WARC archive where it doesn't 
+      // start with a WARCInfo record.
+      callFinishTrigger()
+    }
+  }
+
+  /*
+   * Private method that calls the start trigger if it is defined
+   */
+  private def callStartTrigger() = {
+    val filename = currentwarcinfo.get("WARC-Filename") match {
+      case Some(f) => f
+      case None => "No Filename Found - Unable to Parse File"
+    }
+    startTrigger match {
+      case Some(f) => f.call(filename)
+      case None =>
+    }
+
+  }
+
+  /*
+   * Private method the calles the finish trigger if it is defined
+   */
+  private def callFinishTrigger() = {
+    // Call the finish trigger
+    val filename = currentwarcinfo.get("WARC-Filename") match {
+      case Some(f) => f
+      case None => "No Filename Found - Unable to Parse File"
+    }
+    finishTrigger match {
+      case Some(f) => f.call(filename)
+      case None =>
+    }
+  }
 
 
   /*
@@ -294,6 +369,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       } else {
         // headers are complete, we should know how many bytes of content to read
         f.bytestoread = currentwarcinfo.getContentSizeInBytes()
+
         // event E2, if the headers complete we transition to S2
         return(m(E2))
       }
@@ -624,17 +700,9 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // or another
     if (state == Sink1 || state == Sink2 || state == Final) {
       hasnext = false
-    }
 
-
-    // Need to see our final state and do some cleanup
-    // If we hit Sink1 something went wrong, throw an error, otherwise
-    // we can keep trucking
-    /*
-    state match {
-      case Sink1 => throw new RuntimeException("Corrupt WET Archive .. more info here")
-      case _ => 
+      // We are done, call the finish trigger if we have one
+      callFinishTrigger()
     }
-    */
   }
 }

@@ -6,6 +6,7 @@ import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
 import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
 import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
 import collection.mutable.Stack
 import scala.collection.immutable.Map
 import scala.collection.mutable.ListBuffer
@@ -117,10 +118,209 @@ class ParserSpec extends FlatSpec {
   val corruptunexpectedinfo = this.getClass().getClassLoader().getResource("corrupt_two_warcinfo.wet.gz")
 
 
-
-
   /*
    * Unit Tests
+   */
+
+  /*
+   * Start and Finish Trigger Tests
+   *
+   * The Parser allows you to pass an object that will be called when the Parser starts
+   * and when the Parser finishes. These specs test that functionality.
+   *
+   */
+
+  "parser" should "accept an object to be called when it starts parsing" in {
+
+	class MyStartTrigger extends ParserTrigger {
+      var c: Integer = 0
+      var fileid: Option[String] = None : Option[String]
+
+	  def call(file_being_parsed: String): Unit = {
+        fileid = Some(file_being_parsed)
+        c += 1        
+	  }
+
+      def getTimesCalled(): Integer = {
+        c
+      }
+
+      def getFileId(): Option[String] = {
+        fileid
+      }
+	}
+
+    val myStartTrigger = new MyStartTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addStartTrigger(myStartTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myStartTrigger.getTimesCalled() == 1)
+    assert(myStartTrigger.getFileId == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
+  }
+
+  "parser" should "return Unable to Parse File as the filename to the startTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+	class MyStartTrigger extends ParserTrigger {
+      var c: Integer = 0
+      var fileid: Option[String] = None : Option[String]
+
+	  def call(file_being_parsed: String): Unit = {
+        fileid = Some(file_being_parsed)
+        c += 1        
+	  }
+
+      def getTimesCalled(): Integer = {
+        c
+      }
+
+      def getFileId(): Option[String] = {
+        fileid
+      }
+	}
+
+    val myStartTrigger = new MyStartTrigger
+
+    parser.addStartTrigger(myStartTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myStartTrigger.getTimesCalled() == 1)
+    assert(myStartTrigger.getFileId == Some("No Filename Found - Unable to Parse File"))
+  }
+
+  "parser" should "accept an object to be called when it finishes parsing" in {
+
+	class MyFinishTrigger extends ParserTrigger {
+      var c: Integer = 0
+      var fileid: Option[String] = None : Option[String]
+
+	  def call(file_being_parsed: String): Unit = {
+        fileid = Some(file_being_parsed)
+        c += 1        
+	  }
+
+      def getTimesCalled(): Integer = {
+        c
+      }
+
+      def getFileId(): Option[String] = {
+        fileid
+      }
+	}
+
+    val myFinishTrigger = new MyFinishTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getTimesCalled() == 1)
+    assert(myFinishTrigger.getFileId == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
+  }
+
+  "parser" should "return Unable to Parse File as the filename to the finishTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+	class MyFinishTrigger extends ParserTrigger {
+      var c: Integer = 0
+      var fileid: Option[String] = None : Option[String]
+
+	  def call(file_being_parsed: String): Unit = {
+        fileid = Some(file_being_parsed)
+        c += 1        
+	  }
+
+      def getTimesCalled(): Integer = {
+        c
+      }
+
+      def getFileId(): Option[String] = {
+        fileid
+      }
+	}
+
+    val myFinishTrigger = new MyFinishTrigger
+
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getTimesCalled() == 1)
+    assert(myFinishTrigger.getFileId == Some("No Filename Found - Unable to Parse File"))
+  }
+
+  /*
+   * Categorizer Tests
+   *
+   * These test the categorizer function of the Parser.
+   *
+   */
+
+  "parser" should "accept a categorizer to use when parsing records" in {
+    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+    val cat = records(0).getCategories() match {
+      case Some(a) => a
+      case _ => Set[String]()
+    }
+    assert(cat.contains("asthma"))
+  }
+
+  "parser" should "apply the categorizer to multiple records" in {
+    val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+    //val parser = Parser(new BufferedInputStream(
+    //  new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), c, 100000)
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+	// Now grab all the documents where the content mentions asthma at all
+	// using a simple filter and the contains method.
+	// Essentially this pulls out all the asthma content, as MyWARCFilter
+	// matched both asthma and politics content
+	def mycontentfilter(content: Option[String]): Boolean = {
+		content match {
+			case Some(c) => c.contains("asthma")
+			case _ => false
+		}
+	}
+	val l = records.filter(y => mycontentfilter(y.getContent()))
+
+    def getcat(record: WARCRecord) = { 
+        record.getCategories() match {
+        case Some(a) => a
+        case _ => Set[String]()
+      }
+    }
+
+    l.foreach((lr) => {
+      assert(getcat(lr).contains("asthma"))
+    })
+  }
+
+  /*
+   * Parser State Tests
+   *
+   * These tests are designed to required the parser to be in specific external states upon
+   * reading certain input. The test the internal logic of the Parser FSA
+   *
    */
 
   // Testing State 1
@@ -467,53 +667,6 @@ class ParserSpec extends FlatSpec {
     assert(records.size == 4)
   }
 
-  "parser" should "accept a categorizer to use when parsing records" in {
-    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
-    val parser = Parser(new BufferedInputStream(
-      new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
-    var records = ListBuffer[WARCRecord]()
-    parser.foreach((wc: WARCRecord) => records += wc)
-    val cat = records(0).getCategories() match {
-      case Some(a) => a
-      case _ => Set[String]()
-    }
-    println(records(0).getCategories())
-    assert(cat.contains("asthma"))
-  }
-
-  "parser" should "apply the categorizer to multiple records" in {
-    val c: MyWARCCategorizer = new MyWARCCategorizer(1)
-    //val parser = Parser(new BufferedInputStream(
-    //  new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
-    val parser = Parser(new BufferedInputStream(
-      new FileInputStream(new File(filter_test_1.getFile()))), c, 100000)
-    var records = ListBuffer[WARCRecord]()
-    parser.foreach((wc: WARCRecord) => records += wc)
-
-	// Now grab all the documents where the content mentions asthma at all
-	// using a simple filter and the contains method.
-	// Essentially this pulls out all the asthma content, as MyWARCFilter
-	// matched both asthma and politics content
-	def mycontentfilter(content: Option[String]): Boolean = {
-		content match {
-			case Some(c) => c.contains("asthma")
-			case _ => false
-		}
-	}
-	val l = records.filter(y => mycontentfilter(y.getContent()))
-    println(l.size)
-
-    def getcat(record: WARCRecord) = { 
-        record.getCategories() match {
-        case Some(a) => a
-        case _ => Set[String]()
-      }
-    }
-
-    l.foreach((lr) => {
-      assert(getcat(lr).contains("asthma"))
-    })
-  }
 
   /*
    * I probably also need to extend the WARCRecord classes so that they check to make sure
