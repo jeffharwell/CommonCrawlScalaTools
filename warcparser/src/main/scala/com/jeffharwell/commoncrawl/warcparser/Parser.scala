@@ -93,6 +93,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   val statetrace = ListBuffer[State]()
   var debug = false
   var steps = 0
+  var corruptiondetected = false
 
   var lasterror = "" // contains the last error, which is hopefully the reason
                      // we ended up in a given sink state
@@ -141,7 +142,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       // Hmm we are adding a finish trigger but we are already done parsing
       // this can happen in cases of a corrupt WARC archive where it doesn't 
       // start with a WARCInfo record.
-      callFinishTrigger()
+      callFinishTrigger(None: Option[State])
     }
   }
 
@@ -149,12 +150,15 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * Private method that calls the start trigger if it is defined
    */
   private def callStartTrigger() = {
-    val filename = currentwarcinfo.get("WARC-Filename") match {
-      case Some(f) => f
-      case None => "No Filename Found - Unable to Parse File"
+    val extractedfilename: Option[String] = currentwarcinfo.get("WARC-Filename")
+    val logmessage: Option[String] = currentwarcinfo.get("WARC-Filename") match {
+      case Some(f) => None: Option[String]
+      case None => Some("Unable to Parse File - didn't even get a WARCInfo record. Is the file corrupt?")
     }
+
+    // if we have a startTrigger, call it
     startTrigger match {
-      case Some(f) => f.call(filename)
+      case Some(f) => f.call(extractedfilename, recordcount, logmessage)
       case None =>
     }
 
@@ -163,14 +167,51 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   /*
    * Private method the calles the finish trigger if it is defined
    */
-  private def callFinishTrigger() = {
-    // Call the finish trigger
-    val filename = currentwarcinfo.get("WARC-Filename") match {
-      case Some(f) => f
-      case None => "No Filename Found - Unable to Parse File"
+  private def callFinishTrigger(state: Option[State]) = {
+    // handle the case of the finishTrigger essentially being called immediately when it is added
+    // this means that by the time the trigger was added the parse is already done. This could mean
+    // that the file was really corrupt and the parser swept through the entire file looking for even
+    // one valid WARC Conversion record, or it may not have even been able to find a complete WARC Info
+    // record. This could also mean that the caller add the finish trigger after the parse was already 
+    // completed, in which case we don't know the final state and have to guess a bit as to what happened
+    // based on the final state of the parser based on the corruptiondetected flag and the recordcount field.
+    def handleNoState(): Some[String] = {
+      if (corruptiondetected && currentwarcinfo.get("WARC-Filename") == None) {
+        Some("File Parse Error - Corruption detected, was not able to find complete WARCInfo record")
+      } else if (corruptiondetected) {
+        if (recordcount > 0) {
+          Some("File Parse Error - Corruption detected but some records were extracted")
+        } else {
+          Some("File Parse Error - Corruption detected and no WARC Conversion records were extracted")
+        }
+      } else if (recordcount > 0) {
+        Some("File Parsed Normally and retrieved records ... did you added the trigger after the parse was already done??")
+      } else {
+        Some("File Parsed Normally but retreived no WARC Conversion records.")
+      }
     }
+
+    // Sink2 means that we got a valid WARCInfo record, so the file did parse, but we ran into trouble later and the last WARC
+    // Conversion record was corrupt somehow.
+    def handleSink2(): Some[String] = {
+      if (recordcount > 0) {
+        Some("End of file was corrupt, some records were extracted successfully.")
+      } else {
+        Some("End of file was corrupt and no WARC Conversion records were extracted successfully.")
+      }
+    }
+
+    val extractedfilename: Option[String] = currentwarcinfo.get("WARC-Filename")
+    val logmessage: Option[String] = state match {
+      case Some(Sink1) => Some("Unable to Parse File - didn't even get a complete WARCInfo record. Is the file corrupt?")
+      case Some(Sink2) => handleSink2()
+      case Some(Final) => if (corruptiondetected) { Some("File Parsed - Some corruption detected") } else { Some("File Parsed Normally") }
+      case _ => handleNoState() 
+    }
+
+    // if we have a finish trigger then call it
     finishTrigger match {
-      case Some(f) => f.call(filename)
+      case Some(f) => f.call(extractedfilename, recordcount, logmessage)
       case None =>
     }
   }
@@ -338,6 +379,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
           // a complete WARCInfo header set. Proceed to Sink1 with an error
           lasterror = s"Fatal: S1 -> Sink1: We were unable to get a complete set of warcinfo headers in ${state1tries} tries"
           state1tries = 0
+          corruptiondetected = true
           return(m(EX1))
         }
         state1tries += 1
@@ -347,6 +389,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
           // we hit the end of the stream without getting a complete set
           // of headers, something is corrupt ... probably
           lasterror = s"S1 -> Sink1: We hit the end of the stream without getting a complete set of WARCInfo headers"
+          corruptiondetected = true
           state1tries = 0
           return(m(EX1))
         }
@@ -359,6 +402,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
             // apparently we are not parsing a warcinfo type WARC record
             // move to the error state
             lasterror = s"S1 -> Sink1: Record does not have WARC-Type = warcinfo as required, archive may be corrupt."
+            corruptiondetected = true
             state1tries = 0
             return(m(EX1))
           }
@@ -399,6 +443,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
         // we hit the end of the stream without being able to get the content
         // something is corrupt ... probably
         lasterror = "S2 -> Sink1: We hit the end of stream without getting content for the WARCInfo record"
+        corruptiondetected = true
         return(m(EX1))
       }
 
@@ -447,6 +492,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
           // of headers, something is corrupt ... probably
           lasterror = "S3 -> Sink1: We hit the end of the stream without getting a complete set of WARCConversion headers"
           state3tries = 0
+          corruptiondetected = true
           return(m(EX5))
         }
       }
@@ -472,6 +518,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
           // move to S6 to see if there are any other records in this
           // stream that we could try to parse
           state3tries = 0
+          corruptiondetected = true
           return(m(E7))
         } else {
           // keep looking for headers
@@ -506,6 +553,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
         // we hit the end of the stream without being able to get the content
         // something is corrupt ... probably
         lasterror = s"S4 -> ${m(EX8).toString()}: End of Stream without getting content for WARCConversion"
+        corruptiondetected = true
         return(m(EX8))
       }
 
@@ -518,10 +566,14 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       // WARCConversion record should be complete now, if so move to get the next one
       // if not move to error state.
       currentwarcconversion.isComplete() match {
-        case true => return(m(E8))
+        case true => {
+          // we have a complete WARCConversion record
+          recordcount += 1
+          m(E8)
+        }
         case false => {
           lasterror = s"S4 -> ${m(EX8).toString()}: got content but WARCConversion still not complete"
-          return(m(EX8))
+          m(EX8)
         }
       }
     }
@@ -563,6 +615,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       if (reader.isEndOfStream()) {
         // we ran out of stream before finding another record goto Sink2
         lasterror = "S6 -> Sink2: Unable to find any additional WARCConversion records after corruption detected"
+        corruptiondetected = true
         return(m(EX6))
       }
 
@@ -688,7 +741,24 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // with a complete WARC conversion record
     var state: State = fsa.run()
     steps = steps + 1
+    // This is the main run loop, keep running the fsa (repeatedly calling fsa.run() until
+    // we hit one of the states specified below.
     while (state != Sink1 && state != Sink2 && state != Final && state != S5) {
+      // I keep having to look this up, so there is the logic.
+      // When you call fsa.run() it calls the .event method on the EXISTING state.
+      // That event method will run the states logic and return the new internal state.
+      // So .. the state that is returned, which goes into the 'state' variable below,
+      // has not had it's .event method called yet, it is waiting for the next call
+      // to fsa.run().
+      //
+      // For example: state S5 is the stop state for having a complete WARC record.
+      //              The only way to get to S5 is through S4. So if you want to 
+      //              increment the total number of WARCConversion records parsed
+      //              you would increment it at the end of the S4 .event() method
+      //              before it returns S5. If you put the increment code in the 
+      //              .event() method of S5 you would always be off one during the
+      //              parsing itself, although you would catch up with S5 transitions
+      //              to Final via S3 after the last record.
       state = fsa.run()
       steps = steps + 1
       if (steplimit > 0 && steps > steplimit) {
@@ -702,7 +772,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       hasnext = false
 
       // We are done, call the finish trigger if we have one
-      callFinishTrigger()
+      callFinishTrigger(Some(state))
     }
   }
 }

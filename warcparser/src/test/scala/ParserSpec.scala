@@ -100,6 +100,32 @@ class ParserTestLite(inputstream: InputStream, categorizer: EmptyCategorizer, st
   }
 }
 
+// Our Default FinishTrigger for testing
+class MyParserTrigger extends ParserTrigger {
+  var c: Integer = 0
+  var recordcount: Integer = 0
+  var fileid: Option[String] = None : Option[String]
+  var logmessage: Option[String] = None: Option[String]
+
+  override def call(extractedfilename: Option[String], parserrecordcount: Integer, parserlogmessage: Option[String]): Unit = {
+    fileid = extractedfilename
+    recordcount = parserrecordcount
+    logmessage = parserlogmessage
+    c += 1        
+  }
+  def getTimesCalled(): Integer = {
+    c
+  }
+  def getFileId(): Option[String] = {
+    fileid
+  }
+  def getRecordCount(): Integer = {
+    recordcount
+  }
+  def getLogMessage(): Option[String] = {
+    logmessage
+  }
+}
 
 class ParserSpec extends FlatSpec {
 
@@ -131,26 +157,7 @@ class ParserSpec extends FlatSpec {
    */
 
   "parser" should "accept an object to be called when it starts parsing" in {
-
-	class MyStartTrigger extends ParserTrigger {
-      var c: Integer = 0
-      var fileid: Option[String] = None : Option[String]
-
-	  def call(file_being_parsed: String): Unit = {
-        fileid = Some(file_being_parsed)
-        c += 1        
-	  }
-
-      def getTimesCalled(): Integer = {
-        c
-      }
-
-      def getFileId(): Option[String] = {
-        fileid
-      }
-	}
-
-    val myStartTrigger = new MyStartTrigger
+    val myStartTrigger = new MyParserTrigger
 
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(filter_test_1.getFile()))), 100000)
@@ -158,65 +165,70 @@ class ParserSpec extends FlatSpec {
 
     var records = ListBuffer[WARCRecord]()
     parser.foreach((wc: WARCRecord) => records += wc)
+    println(records.size)
 
     assert(myStartTrigger.getTimesCalled() == 1)
     assert(myStartTrigger.getFileId == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
   }
 
-  "parser" should "return Unable to Parse File as the filename to the startTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+  "parser" should "startTrigger should record 1 record parsed in a valid WET archive file" in {
+    val myStartTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addStartTrigger(myStartTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+    println(records.size)
+
+    assert(myStartTrigger.getRecordCount == 1)
+  }
+
+  "parser" should "not return a filename to the startTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
 
-	class MyStartTrigger extends ParserTrigger {
-      var c: Integer = 0
-      var fileid: Option[String] = None : Option[String]
-
-	  def call(file_being_parsed: String): Unit = {
-        fileid = Some(file_being_parsed)
-        c += 1        
-	  }
-
-      def getTimesCalled(): Integer = {
-        c
-      }
-
-      def getFileId(): Option[String] = {
-        fileid
-      }
-	}
-
-    val myStartTrigger = new MyStartTrigger
+    val myStartTrigger = new MyParserTrigger
 
     parser.addStartTrigger(myStartTrigger)
 
     var records = ListBuffer[WARCRecord]()
     parser.foreach((wc: WARCRecord) => records += wc)
 
-    assert(myStartTrigger.getTimesCalled() == 1)
-    assert(myStartTrigger.getFileId == Some("No Filename Found - Unable to Parse File"))
+    assert(myStartTrigger.getFileId == None)
+  }
+
+  "parser" should "return zero record count to the startTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+    val myStartTrigger = new MyParserTrigger
+
+    parser.addStartTrigger(myStartTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myStartTrigger.getRecordCount == 0)
+  }
+
+  "parser" should "return a log message to the startTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+    val myStartTrigger = new MyParserTrigger
+
+    parser.addStartTrigger(myStartTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myStartTrigger.getLogMessage == Some("Unable to Parse File - didn't even get a WARCInfo record. Is the file corrupt?"))
   }
 
   "parser" should "accept an object to be called when it finishes parsing" in {
-
-	class MyFinishTrigger extends ParserTrigger {
-      var c: Integer = 0
-      var fileid: Option[String] = None : Option[String]
-
-	  def call(file_being_parsed: String): Unit = {
-        fileid = Some(file_being_parsed)
-        c += 1        
-	  }
-
-      def getTimesCalled(): Integer = {
-        c
-      }
-
-      def getFileId(): Option[String] = {
-        fileid
-      }
-	}
-
-    val myFinishTrigger = new MyFinishTrigger
+    val myFinishTrigger = new MyParserTrigger
 
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(filter_test_1.getFile()))), 100000)
@@ -226,41 +238,169 @@ class ParserSpec extends FlatSpec {
     parser.foreach((wc: WARCRecord) => records += wc)
 
     assert(myFinishTrigger.getTimesCalled() == 1)
+  }
+
+  "parser" should "pass the extracted filename to the finishTrigger when it finishes parsing" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
     assert(myFinishTrigger.getFileId == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
   }
 
-  "parser" should "return Unable to Parse File as the filename to the finishTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+  "parser" should "pass the record count to the finishTrigger when it finishes parsing and it must match the number of records that are parsed" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getRecordCount == records.size)
+  }
+
+  "parser" should "give a success log message to the finishTrigger if parsing is successful and records are retreived" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getLogMessage == Some("File Parsed Normally"))
+  }
+
+  "parser" should "give a confused log message to the finishTrigger if the finished trigger is added after parsing is completed" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    parser.addFinishTrigger(myFinishTrigger)
+
+    assert(myFinishTrigger.getLogMessage == Some("File Parsed Normally and retrieved records ... did you added the trigger after the parse was already done??"))
+  }
+
+
+  "parser" should "not return an extracted file name to the finishTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
 
-	class MyFinishTrigger extends ParserTrigger {
-      var c: Integer = 0
-      var fileid: Option[String] = None : Option[String]
-
-	  def call(file_being_parsed: String): Unit = {
-        fileid = Some(file_being_parsed)
-        c += 1        
-	  }
-
-      def getTimesCalled(): Integer = {
-        c
-      }
-
-      def getFileId(): Option[String] = {
-        fileid
-      }
-	}
-
-    val myFinishTrigger = new MyFinishTrigger
+    val myFinishTrigger = new MyParserTrigger
 
     parser.addFinishTrigger(myFinishTrigger)
 
     var records = ListBuffer[WARCRecord]()
     parser.foreach((wc: WARCRecord) => records += wc)
 
-    assert(myFinishTrigger.getTimesCalled() == 1)
-    assert(myFinishTrigger.getFileId == Some("No Filename Found - Unable to Parse File"))
+    assert(myFinishTrigger.getFileId == None)
   }
+
+  "parser" should "return a no wARC Info log message to the finishTrigger if it cannot extract the name of the file, meaning there was no valid WARCInfo in the file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+    val myFinishTrigger = new MyParserTrigger
+
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getLogMessage == Some("File Parse Error - Corruption detected, was not able to find complete WARCInfo record"))
+  }
+
+  "parser" should "return a no WARC Conversion records log message if the file parses but no WARC Conversion records are found" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptconversion2.getFile()))))
+
+    val myFinishTrigger = new MyParserTrigger
+
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(records.size == 0)
+    assert(parser.getRecordCount() == 0)
+    assert(myFinishTrigger.getLogMessage == Some("File Parse Error - Corruption detected and no WARC Conversion records were extracted"))
+  }
+
+  "parser" should "return a corruption detected log message after finding 4 WARCRecord objects and skipping a corrupt record in file corruptconversion1" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptconversion1.getFile()))))
+
+    val myFinishTrigger = new MyParserTrigger
+    parser.addFinishTrigger(myFinishTrigger)
+
+    var records = ListBuffer[WARCRecord]()
+
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(myFinishTrigger.getLogMessage == Some("File Parsed - Some corruption detected"))
+  }
+
+
+  /*
+   * Record Count Tests
+   *
+   * The parser should make the number of records parsed available
+   *
+   */
+
+  "parser" should "have a record count of one upon initial transition to state S5" in
+  {
+    val parser = ParserTest(new BufferedInputStream(
+      new FileInputStream(new File(frag3.getFile()))))
+    parser.setDebug()
+    val stopstates = List[String]("S5","Sink1","Final")
+
+    while (!stopstates.contains(parser.getParserState())) {
+      parser.nextFSAStep()
+    }
+
+    assert(parser.getParserState == "S5")
+    assert(parser.getRecordCount() == 1)
+  }
+
+  "parser" should "have a record count of 5 after extracting 5 WARC conversion records from fragment3.wet.gz" in
+  {
+    // Which in turn should match the number of records it actually returns, 5
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(frag3.getFile()))))
+
+    parser.setDebug()
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(records.size == 5)
+    assert(parser.getRecordCount() == 5)
+  }
+
+  "parser" should "have a record count of 0 if there are no valid WARC conversion records in a file" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(corruptunexpectedconversion.getFile()))))
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(records.size == 0)
+    assert(parser.getRecordCount() == 0)
+  }
+
+
 
   /*
    * Categorizer Tests
