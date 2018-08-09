@@ -1,16 +1,12 @@
 package com.jeffharwell.commoncrawl.warcparser
 
-// The Parser won't accept a filter that doesn't 
-// extend the IsAWARCFilter trait
-trait IsAWARCFilter
-
 /*
  * Call the implements a WARC Record Filter
  *
  * At present this class applies some basic rules to the content of the WARC Record
  * and returns true if it matches false otherwise.
  */
-class MyWARCFilter() extends IsAWARCFilter {
+class MyWARCFilter() extends java.io.Serializable {
   /*
    * MyWARCFilter
    *
