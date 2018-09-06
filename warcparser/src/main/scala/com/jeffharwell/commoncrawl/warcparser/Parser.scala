@@ -751,6 +751,8 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       // has not had it's .event method called yet, it is waiting for the next call
       // to fsa.run().
       //
+      // If we hit S5 we know we have a complete record. 
+      //
       // For example: state S5 is the stop state for having a complete WARC record.
       //              The only way to get to S5 is through S4. So if you want to 
       //              increment the total number of WARCConversion records parsed

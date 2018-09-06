@@ -214,7 +214,8 @@ object CountLocalFiltered {
       } else {
         println("Reading and filtering a compressed WET archive straight from the web.")
         // This is the path from the wet.paths file
-        var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698540409.8/wet/CC-MAIN-20161202170900-00007-ip-10-31-129-80.ec2.internal.warc.wet.gz"
+        //var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698540409.8/wet/CC-MAIN-20161202170900-00007-ip-10-31-129-80.ec2.internal.warc.wet.gz"
+        var filepath = "crawl-data/CC-MAIN-2016-50/segments/1480698542657.90/wet/CC-MAIN-20161202170902-00359-ip-10-31-129-80.ec2.internal.warc.wet.gz"
         val urlbase = "https://commoncrawl.s3.amazonaws.com/"
         var url = new URL(urlbase+filepath)
         //println("URL is "+fileurl)
