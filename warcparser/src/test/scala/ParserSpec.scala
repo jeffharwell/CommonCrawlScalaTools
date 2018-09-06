@@ -7,6 +7,7 @@ import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
 import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
 import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
 import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
+import com.jeffharwell.commoncrawl.warcparser.ParserTooSlowException
 import collection.mutable.Stack
 import scala.collection.immutable.Map
 import scala.collection.mutable.ListBuffer
@@ -98,6 +99,15 @@ class ParserTestLite(inputstream: InputStream, categorizer: EmptyCategorizer, st
   def getBytesToRead(): Int = {
     return fsa.bytestoread
   }
+
+  /*
+   * Returns the size of the internal queue being used to record the elapsed time for the 
+   * last n documents that were parsed.
+   */
+  def getQueueSize(): Int = {
+    rate_queue.size
+  }
+
 }
 
 // Our Default FinishTrigger for testing
@@ -165,7 +175,6 @@ class ParserSpec extends FlatSpec {
 
     var records = ListBuffer[WARCRecord]()
     parser.foreach((wc: WARCRecord) => records += wc)
-    println(records.size)
 
     assert(myStartTrigger.getTimesCalled() == 1)
     assert(myStartTrigger.getFileId == Some("CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"))
@@ -180,7 +189,6 @@ class ParserSpec extends FlatSpec {
 
     var records = ListBuffer[WARCRecord]()
     parser.foreach((wc: WARCRecord) => records += wc)
-    println(records.size)
 
     assert(myStartTrigger.getRecordCount == 1)
   }
@@ -352,6 +360,122 @@ class ParserSpec extends FlatSpec {
     assert(myFinishTrigger.getLogMessage == Some("File Parsed - Some corruption detected"))
   }
 
+  /*
+   * Parser Rate Tests
+   *
+   * Test the requirements that the parser measure and report the rate at which it is parsing documents.
+   *
+   */
+
+  "parser" should "report the average time it took to parse the last 10 documents" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    var one_hour = 3600000
+    parser.setRateLimit(one_hour, 5) // There is something wrong with your computer if you can't hit one record per hour
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(parser.getAverageParseRate > 0)
+  }
+
+  "parser" should "should not track the elapsed time if no rate limit is set" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    // We have 25 documents in the file filter_test_1, so if our default queue_size is 10
+    // we should end up with 10 times in the rate queue
+    assert(parser.getQueueSize() == 0)
+    assert(parser.getAverageParseRate() == 0)
+  }
+
+
+  "parser" should "should use a default queue size of 10 when setting a rate limit" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    var one_hour = 3600000
+    parser.setRateLimit(one_hour, 5) // There is something wrong with your computer if you can't hit one record per hour
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    // We have 25 documents in the file filter_test_1, so if our default queue_size is 10
+    // we should end up with 10 times in the rate queue
+    assert(parser.getQueueSize() == 5)
+  }
+
+  "parser" should "should set the queue size to 5 if that argument is passed while setting a rate limit" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    var one_hour = 3600000
+    parser.setRateLimit(one_hour, 5) // There is something wrong with your computer if you can't hit one record per hour
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    // We have 25 documents in the file filter_test_1, so if our default queue_size is 10
+    // we should end up with 10 times in the rate queue
+    assert(parser.getQueueSize() == 5)
+  }
+
+  "parser" should "should have a queue size equal to the number of documents parsed if queue size is greater than the number of documents in the file" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    var one_hour = 3600000
+    parser.setRateLimit(one_hour, 50) // There is something wrong with your computer if you can't hit one record per hour
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(records.size < 50) // records.size for filter_test_1 will be 25
+    assert(parser.getQueueSize() == records.size)
+  }
+
+  "parser" should "throw a ParserTooSlowException if the parse rate is set very low" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.setRateLimit(.0000001) // it should take Moore's law a bit to catch up to this. Parsing a record per nanosecond.
+
+    var records = ListBuffer[WARCRecord]()
+
+    assertThrows[ParserTooSlowException] {
+      parser.foreach((wc: WARCRecord) => records += wc)
+    }
+
+    assert(parser.getAverageParseRate > 0)
+  }
+
+  "parser" should "not throw a ParserTooSlowException if the parse rate is very high" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+
+    var one_hour = 3600000
+    parser.setRateLimit(one_hour) // There is something wrong with your computer if you can't hit one record per hour
+
+    var records = ListBuffer[WARCRecord]()
+
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(parser.getAverageParseRate < one_hour)
+  }
+
 
   /*
    * Record Count Tests
@@ -459,7 +583,7 @@ class ParserSpec extends FlatSpec {
    * Parser State Tests
    *
    * These tests are designed to required the parser to be in specific external states upon
-   * reading certain input. The test the internal logic of the Parser FSA
+   * reading certain input. They test the internal logic of the Parser FSA
    *
    */
 

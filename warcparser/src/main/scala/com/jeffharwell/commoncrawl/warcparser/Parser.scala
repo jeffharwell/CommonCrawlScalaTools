@@ -6,8 +6,10 @@ import java.io.InputStream
 import java.io.FileInputStream
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.lang.System
 import java.util.zip.GZIPInputStream
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Queue
 import scala.collection.immutable.List
 import scala.collection.immutable.Map
 
@@ -95,6 +97,10 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   var steps = 0
   var corruptiondetected = false
 
+  var rate_queue = new Queue[Long] // holds the elapsed time taken to parse the last 10 (or less) documents
+  var rate_limit: Double = 0.0 // the rate limit. If our average rate drops below this limit then throw a Runtime Error
+  var queue_size: Int = 10 // number of documents for which we keep the rate history
+
   var lasterror = "" // contains the last error, which is hopefully the reason
                      // we ended up in a given sink state
 
@@ -104,6 +110,53 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
 
   // Initialize our reader
   val reader = new Reader(inputstream)
+
+  /*
+   * Functions for dealing with the parse rate
+   */
+
+  /*
+   * Returns the average time is milliseconds that it took to process the 
+   * documents for which the elapsed time is recorded in the queue. For the 
+   * current code that is the last 10 documents that were parsed.
+   *
+   * Note that it will always return 0 unless a rate limit is set, as the code
+   * does not track the average record parse time unless it is monitoring the rate.
+   * I'm not sure this was the best design choice but it is what we have for now.
+   */
+  def getAverageParseRate(): Double = {
+    var sum = rate_queue.sum.toDouble
+    var avg: Double = 0.0
+    if (rate_queue.size > 0) {
+      avg = sum / rate_queue.size
+    }
+
+    avg
+  }
+
+  /*
+   * Set a rate limit in milliseconds. If the parser is running more slowly than the set rate limit then 
+   * it will throw a RuntimeError
+   *
+   * @param limit the average rate in milliseconds under which the parser will throw a ParserTooSlowException
+   * @param q_size the number of recent documents to use with calculating the average rate, defaults to 10
+   */
+  def setRateLimit(limit: Double, q_size: Int = 10) = {
+    rate_limit = limit
+    queue_size = q_size
+  }
+
+  /*
+   * Checks the rate limit and throws the error
+   */
+  def checkRateLimit() = {
+    if (rate_limit > 0) {
+      if (getAverageParseRate() > rate_limit) {
+        throw new ParserTooSlowException("The parser is parsing records more slowly than the rate limit ${rate_limit) ms that was set.")
+      }
+    }
+  }
+
 
   /*
    * Functions for setting the Start and Finish Trigger
@@ -737,6 +790,15 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    
     // recursive routine to run the FSA
 
+    // Set our start time if necessary
+    var start_time = {
+      if (rate_limit > 0) {
+        System.currentTimeMillis()
+      } else {
+        0
+      }
+    }
+
     // this shouldn't return until the instance variable 'currentwarcconversion' is set
     // with a complete WARC conversion record
     var state: State = fsa.run()
@@ -768,10 +830,28 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       }
     }
 
+    // Calculate our rate if we have a valid start ime and a rate limit is set
+    if (start_time > 0 && rate_limit > 0) {
+      var finish_time = System.currentTimeMillis()
+      var elapsed_millis = finish_time - start_time
+      if (rate_queue.size >= queue_size) {
+        // We are only keeping stats on the last 10 documents that we parsed
+        rate_queue.dequeue
+      }
+      rate_queue += elapsed_millis
+
+      // Check the rate limit, this will throw a ParserTooSlowException if we are parsing too slowly.
+      // This is useful if we want the parser to quit if the network connection is too slow and so 
+      // we are only crawling through the record.
+      checkRateLimit()
+    }
+
+
     // These states mean we are done with the file one way
     // or another
     if (state == Sink1 || state == Sink2 || state == Final) {
       hasnext = false
+
 
       // We are done, call the finish trigger if we have one
       callFinishTrigger(Some(state))
