@@ -150,7 +150,8 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * Checks the rate limit and throws the error
    */
   def checkRateLimit() = {
-    if (rate_limit > 0) {
+    // If the rate limit is set and the rate_queue is full
+    if (rate_limit > 0 && rate_queue.size == queue_size ) {
       if (getAverageParseRate() > rate_limit) {
         throw new ParserTooSlowException("The parser is parsing records more slowly than the rate limit ${rate_limit) ms that was set.")
       }

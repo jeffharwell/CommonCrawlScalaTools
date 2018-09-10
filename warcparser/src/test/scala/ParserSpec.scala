@@ -476,6 +476,20 @@ class ParserSpec extends FlatSpec {
     assert(parser.getAverageParseRate < one_hour)
   }
 
+  "parser" should "should not throw a ParserTooSlowException/test the rate until the queue is full" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    val parser = ParserTestLite(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    var one_nanosecond = .0000001 // it should take Moore's law a bit to catch up to this. Parsing a record per nanosecond.
+    parser.setRateLimit(one_nanosecond, 50) 
+
+    var records = ListBuffer[WARCRecord]()
+    parser.foreach((wc: WARCRecord) => records += wc)
+
+    assert(records.size < 50) // records.size for filter_test_1 will be 25
+    assert(parser.getQueueSize() == records.size)
+  }
 
   /*
    * Record Count Tests
