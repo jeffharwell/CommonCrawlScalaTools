@@ -6,7 +6,7 @@ echo "The code in this bash script will publish a jar file to the local Maven re
 echo "But that is unnecessary complexity!"
 exit
 
-SCALAVERSION="2.10"
+SCALAVERSION="2.11"
 VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
 NAME="warcparser"
 ORGANIZATION="com.jeffharwell"

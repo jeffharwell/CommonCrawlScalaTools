@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALAVERSION="2.10"
+SCALAVERSION="2.11"
 VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
 NAME="warcparser"
 ORGANIZATION="com.jeffharwell"

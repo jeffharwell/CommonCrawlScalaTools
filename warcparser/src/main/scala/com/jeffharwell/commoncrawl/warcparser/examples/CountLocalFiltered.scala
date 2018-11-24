@@ -14,7 +14,7 @@ import java.io.File
 import java.net.URL
 
 /* For the examples */
-//import scala.io.StdIn.readLine // scala 2.11 and greater
+import scala.io.StdIn.readLine // scala 2.11 and greater
 
 
 //import MyWARCCategorizer

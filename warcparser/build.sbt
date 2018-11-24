@@ -7,7 +7,12 @@ publishMavenStyle := true
 
 //scalaVersion := "2.12.0"
 // Spark 1.6.7 like Scala 2.10.5
-scalaVersion := "2.10.5"
+//scalaVersion := "2.10.5"
+// Upgraded to Spark 2.3 and scala 2.11.12
+scalaVersion := "2.11.12"
+
+scalacOptions :=
+    scalacOptions.value :+ "-deprecation"
 
 // Realtime Output Please
 logBuffered in Test := false
