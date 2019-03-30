@@ -21,9 +21,81 @@ class PrepareDocumentSpec extends FlatSpec {
     assert(result == correct)
   }
 
+  "preparedocument" should "not throw a java.util.NoSuchElementException when processing this text" in {
+    val document = """Leftists
+SHARE: Email ThisBlogThis!Share to TwitterShare to FacebookShare to Pinterest
+No comments:
+"""
+    val correct = ""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println(result)
+    assert(result == correct)
+  }
+
+  "preparedocument" should "include short lines at the end of a text block" in {
+    val document = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
+  community based organizations, education advocacy groups and all the
+  unions that endorsed Jeffries for their great assistance in bringing
+  vouchers to NYS!"""
+    val correct = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
+  community based organizations, education advocacy groups and all the
+  unions that endorsed Jeffries for their great assistance in bringing
+  vouchers to NYS!"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println(result)
+    //println(correct)
+    assert(result == correct)
+  }  
+
+  "preparedocument" should "include include only one short lines at the end of a text block" in {
+    val document = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
+  community based organizations, education advocacy groups and all the
+  unions that endorsed Jeffries for their great assistance in bringing
+  vouchers to NYS!
+  Yes, I'm disgusted."""
+    val correct = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
+  community based organizations, education advocacy groups and all the
+  unions that endorsed Jeffries for their great assistance in bringing
+  vouchers to NYS!"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println(result)
+    assert(result == correct)
+  }  
+
+  "prepardocument" should "not delete this text block" in {
+    val document = """In case the point was lost in the moment of triumph, Mr. Jeffries
+later told reporters that “the contrast in the race was clear. I
+have a record of success and forming coalitions. These are serious
+times and Congress is a serious job.”
+Mr. Jeffries’s supporters echoed
+that sense throughout the day, amid light turnout in the odd June
+primary to anoint a Democrat to succeed Rep. Ed Towns, who is
+retiring after 30 years in Congress."""
+    val correct = """In case the point was lost in the moment of triumph, Mr. Jeffries
+later told reporters that “the contrast in the race was clear. I
+have a record of success and forming coalitions. These are serious
+times and Congress is a serious job.”
+Mr. Jeffries’s supporters echoed
+that sense throughout the day, amid light turnout in the odd June
+primary to anoint a Democrat to succeed Rep. Ed Towns, who is
+retiring after 30 years in Congress."""
+    var prep = new PrepareDocument(document)
+    prep.setDebug()
+    var result = prep.prepare()
+    println(result)
+    assert(result == correct)
+  }
+
   /*
    * Pulling junk off the end of a text block
    */
+  /*
   "preparedocument" should "remove non sentence material from the end of a text block" in {
     val document = """On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather. What we instantly got was a freak sh"""
     var correct = "On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather."
@@ -37,6 +109,7 @@ class PrepareDocumentSpec extends FlatSpec {
 
     assert(result == correct)
   }
+  */
 
   /*
    * Dealing with Strange Ending Quotes
@@ -57,6 +130,45 @@ class PrepareDocumentSpec extends FlatSpec {
     assert(result == correct)
   }
 
+  "preparedocument" should "handle return Some(63) as the start of the following complex block" in {
+    val document = """nutrition and hydration will be taken away."
+--MICHAEL SCHIAVO
+"On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather. What we instantly got was a freak show of political pornography: lies, distortions, and half-truths -- half-truths being perhaps the blackest of all lies. "
+--BILL MOYERS
+"I hate the Republicans an"""
+    val correct = """"On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather. What we instantly got was a freak show of political pornography: lies, distortions, and half-truths -- half-truths being perhaps the blackest of all lies. """"
+    var prep = new PrepareDocument("Dummy Document")
+    //prep.setDebug()
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(document, "\"", "On")
+    assert(start_index.isDefined && start_index.get == 63)
+  }
+
+  "preparedocument" should "erase a line that does not qualify as a sentence because of lack of capitalization" in {
+    val document = """nutrition and hydration will be taken away."
+--MICHAEL SCHIAVO"""
+    val correct = ""
+    var prep = new PrepareDocument(document)
+    var result = prep.prepare()
+    assert(result == correct)
+  }
+
+  "preparedocument" should "properly handle sentences that use straight double quotes" in {
+    val document = """start blah blah \u0022Nutrition and hydration will be taken away.\u0022 blah blah"""
+    val correct = """\u0022Nutrition and hydration will be taken away.\u0022"""
+    var prep = new PrepareDocument(document)
+    var result = prep.prepare()
+    assert(result == correct)
+  }
+
+  "preparedocument" should "properly handle sentences that use unicode curled double quotes" in {
+    val document = "start blah blah \u201cNutrition and hydration will be taken away.\u201d blah blah"
+    val correct = "\u201cNutrition and hydration will be taken away.\u201d"
+    var prep = new PrepareDocument(document)
+    var result = prep.prepare()
+    assert(result == correct)
+  }
+
+
   /*
    * Dealing with Strang Starting Quotes
    */
@@ -64,13 +176,262 @@ class PrepareDocumentSpec extends FlatSpec {
     val document = """"[Tea Party Republicans] have acted like terrorists." --JOE BIDEN"""
     val correct = """"[Tea Party Republicans] have acted like terrorists.""""
     var prep = new PrepareDocument(document)
-    prep.setDebug()
+    //prep.setDebug()
     var result = prep.prepare()
-    println("-------")
-    println(result)
-    println("-------")
+    //println("-------")
+    //println(result)
+    //println("-------")
     assert(result == correct)
   }
 
+  /*
+   * Testing Other Components
+   */
+
+  /*
+   * Testing the Treebank Token Translator
+   */
+
+  "translate_treebank_token" should "translate '' to \"" in {
+    var prep = new PrepareDocument("this is a dummy document")
+    assert(prep.translateTreebankToken("''") == "\"")
+  }
+  "translate_treebank_token" should "translate ' to '" in {
+    var prep = new PrepareDocument("this is a dummy document")
+    assert(prep.translateTreebankToken("'") == "'")
+  }
+  "translate_treebank_token" should "translate -LRB- to (" in {
+    var prep = new PrepareDocument("this is a dummy document")
+    assert(prep.translateTreebankToken("-LRB-") == "(")
+  }
+  "translate_treebank_token" should "translate -LSB- to [" in {
+    var prep = new PrepareDocument("this is a dummy document")
+    assert(prep.translateTreebankToken("-LSB-") == "[")
+  }
+  "translate_treebank_token" should "translate -LCB- to {" in {
+    var prep = new PrepareDocument("this is a dummy document")
+    assert(prep.translateTreebankToken("-LCB-") == "{")
+  }
+
+  /*
+   * Testing getSentenceEndTokens
+   */
+  "getSentencEndTokenIndex" should "handle a period and a double quote" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var sentence = """"This is my test quote.""""
+    var tokens = prep.tokenize_line(sentence)
+    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(sentence.length))
+  }
+  "getSentencEndTokenIndex" should "handle a period and a unicode closing quote" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var sentence = """have a record of success and forming coalitions. These are serious
+times and Congress is a serious job.”
+Mr. Jeffries’s supporters echoed
+"""
+    var tokens = prep.tokenize_line(sentence)
+    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(104))
+  }
+
+
+  /*
+   * Testing getSentenceStarterTokens
+   */
+  /*
+   *     // previous_tokens = ["''", "-LRB-"] would return the string "\""
+    // previous_tokens = ["-LRB-", "''"] would return the string "\"["
+    // previous_tokens = ["-LRB-", "-LCB-", "'"] would return the string "("
+   */
+
+  "getSentenceStarterTokens" should "accept [\"''\", \"-LRB-\"] and return \"" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var previous = List("''","-LRB-")
+    assert(prep.getSentenceAdditionalStartCharacters(previous) == Some("\""))
+  }
+  "getSentenceStarterTokens" should "accept [\"-LRB-\", \"''\"] and return \"(" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var previous = List("-LRB-","''")
+    assert(prep.getSentenceAdditionalStartCharacters(previous) == Some("\"("))
+  }
+  "getSentenceStarterTokens" should "accept [\"-LRB-\", \"-LCB-\", \"'\"] and return (" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var previous = List("-LRB-","-LCB-","''")
+    assert(prep.getSentenceAdditionalStartCharacters(previous) == Some("("))
+  }
+
+  /*
+   * Testing getSentenceStarterPattern
+   */
+
+  "getStartIndexWithAdditionalStartCharacters" should "return None if the text block is shorter that the string you are searching for" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Somethinglong"
+    var textblock = "short"
+    var previous_chars = ""
+    assert(prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token) == None)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block begins with the string you are searching for and there are no previous characters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var textblock = "Hello World"
+    var previous_chars = ""
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block contains with the starting string and there are no previous characters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var textblock = "Hello World"
+    var previous_chars = ""
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block contains with the starting string and a standard double quote as the start character" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var textblock = """"Hello World"""
+    var previous_chars = "\""
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block contains with the starting string and a curved double quote as the start character" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    prep.setDebug()
+    var start_token = "Hello"
+    var textblock = """\u201cHello World"""
+    var previous_chars = "\u201c"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+
+
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block starts with the starting string and a single previous characters with no spaces" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "["
+    var textblock = "[Hello] World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block starts with the starting string and a single previous characters with a space between them" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    //prep.setDebug()
+    var start_token = "Hello"
+    var previous_chars = "["
+    var textblock = "[ Hello] World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block starts with the starting string and multiple previous characters with no spaces" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "\"["
+    var textblock = "\"[Hello] World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block starts with the starting string and multiple previous characters with spaces between them" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "\"["
+    var textblock = "\" [ Hello] World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with no previous characters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = ""
+    var textblock = "junk Hello World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with one previous characters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "["
+    var textblock = "junk [Hello World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with multiple previous characters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "{{"
+    var textblock = "junk {{Hello World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with multiple previous characters and spaces" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "{{"
+    var textblock = "junk { { Hello World"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with multiple previous characters and multiple spaces" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "{{"
+    var textblock = "junk { {   Hello} World}"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with a double quote" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "\""
+    var textblock = "junk \"Hello World}"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(5) if the sentence in the text block starts at index 5 with a double quote and a space" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var start_token = "Hello"
+    var previous_chars = "\""
+    var textblock = "junk \" Hello World}"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 5)
+  }
+
+  /*
+   * Testing the matchTwoCharacters function which deal with unicode double quotes
+   */
+  "matchTwoCharacters" should "return true if two non-double quote characters are the same" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('a','a'))
+  }
+  "matchTwoCharacters" should "return false if two non-double quote characters are not same" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(!prep.matchTwoCharacters('a','b'))
+  }
+  "matchTwoCharacters" should "return true if two standard double quote characters are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u0022','\u0022'))
+  }
+  "matchTwoCharacters" should "return true if a standard double quote and a open double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u0022','\u201c'))
+  }
+  "matchTwoCharacters" should "return true if a open double quote and a standard double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u201c','\u0022'))
+  }
+  "matchTwoCharacters" should "return true if a standard double quote and a closing double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u0022','\u201d'))
+  }
+  "matchTwoCharacters" should "return true if a closing double quote and a standard double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u201d','\u0022'))
+  }
+  "matchTwoCharacters" should "return true if a closing double quote and an open double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u201d','\u201c'))
+  }
+  "matchTwoCharacters" should "return true if an open double quote and a closing double quote are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u201c','\u201d'))
+  }
 
 }

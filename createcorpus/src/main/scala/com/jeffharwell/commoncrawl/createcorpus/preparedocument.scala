@@ -2,11 +2,12 @@ package com.jeffharwell.commoncrawl.createcorpus
 
 import scala.io.Source
 
-object parseDocument {
+object prepareDocument {
   def main(args: Array[String]): Unit = {
     //var file = "/home/jharwell/Documents/phd/golden_standard/politics/15302326-94bf-4b7e-b8ef-fdec63f5b1ac.txt"
-    var file = "/home/jharwell/Documents/phd/golden_standard/politics/100adb2c-a2a4-4c54-9a63-e606109a090c.txt"
+    //var file = "/home/jharwell/Documents/phd/golden_standard/politics/100adb2c-a2a4-4c54-9a63-e606109a090c.txt"
     //var file = "/home/jharwell/Documents/phd/golden_standard/test_block.txt" 
+    var file = "/home/jharwell/Documents/phd/golden_standard/politics/055f0ada-2b4a-4567-b4bc-71efff22f930.txt"
 
     // https://stackoverflow.com/questions/1284423/read-entire-file-in-scala
     //
@@ -19,7 +20,8 @@ object parseDocument {
 
     // Do preparation
     var parser = new PrepareDocument(document)
-    parser.prepare()
+    //parser.setDebug()
+    println(parser.prepare())
 
 
   }
