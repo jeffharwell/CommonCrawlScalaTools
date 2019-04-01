@@ -103,11 +103,12 @@ class PrepareDocument(document: String) {
       case "'" => "'"
       case "''" => "\""
       case "``" => "\""
+      case "`" => "\u2018"
     }
   }
 
   var valid_opening_brackets = List[String]("-LRB-","-LSB-","-LCB-")
-  var valid_quotes = List[String]("'","''","``")
+  var valid_quotes = List[String]("`","'","''","``")
   def getSentenceAdditionalStartCharacters(previous_tokens: List[String], sentence_start: String = ""): Option[String] = {
     // This is a bit tricky, we want to recurse through the previous tokens list.
     // If the first token is an single or double quote we are done. If it is an opening bracket (-LRB-, -LSB-, -LCB-)
@@ -178,6 +179,7 @@ class PrepareDocument(document: String) {
   // actually be: 'end of a fragment. " [ Bob] did the thing!"', and we need to find the index of the opening double quote. I'm going to try to
   // just hack this thing together with recursion rather then do a full FSA which would solve this elegantly ... blargh
   def getStartIndexWithAdditionalStartCharacters(textblock: String, previous_characters: String, sentence_start_token: String, search_index: Int = 0, textblock_index: Int = 0, current_match: Int = -1): Option[Int] = {
+    if (debug) println("getStartIndexWithAdditionalStartCharacters: Evaluating "+textblock.head)
     if (textblock.length < sentence_start_token.length) {
       // we are done, there is no way the text block can match
       None
@@ -218,18 +220,28 @@ class PrepareDocument(document: String) {
     // curly double quotes \u201c and standard double quotes \u0022 into the token ''
     // so when we are comparing the output of the tokenizer with the original text
     // we need to take this into account
-    if (first == '\u201c' || first == '\u201d') {
-      if (second == '\u201c' || second == '\u201d') {
-        true
-      } else {
-        '"' == second
-      }
+
+    if (first == second) {
+      // that was easy
+      true
+    } else if ((first == '`' || first == '\u2018') && (second == '`' || second == '\u2018')) {
+      // Deal with left single quotes
+      true
+    } else if ((first == '\'' || first == '\u2019') && (second == '\'' || second == '\u2019')) {
+      // Deal with right single quotes
+      true
+    } else if ((first == '"' || first == '\u201c') && (second == '"' || second == '\u201c')) {
+      // Deal with right double quotes
+      true
+    } else if ((first == '"' || first == '\u201d') && (second == '"' || second == '\u201d')) {
+      // Deal with left double quotes
+      true
+    } else if ((first == '\u201d' || first == '\u201c') && (second == '\u201d' || second == '\u201c')) {
+      // Deal with case of left and right double quotes being interchanged
+      // I'm not sure this would actually come up
+      true
     } else {
-      if (second == '\u201c' || second == '\u201d') {
-        first == '"'
-      } else {
-        first == second
-      }
+      false
     }
   }
 
@@ -246,7 +258,7 @@ class PrepareDocument(document: String) {
         // we also want to match the unicode curly closing quote ” which is \u201d
         Some(Pattern.compile("\\"+t+"\\s?[\"\u201d]"))
       } else if (singlequote_pattern.matcher(previous_token).matches()) {
-        Some(Pattern.compile("\\"+t+"\\s?'"))
+        Some(Pattern.compile("\\"+t+"\\s?['`\u2018\u2019]"))
       } else {
         // Every Possible Sentence Ending (!.?) will need to be escaped in the regular
         // expression

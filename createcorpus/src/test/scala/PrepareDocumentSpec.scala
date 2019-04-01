@@ -151,7 +151,6 @@ retiring after 30 years in Congress."""
     var result = prep.prepare()
     assert(result == correct)
   }
-
   "preparedocument" should "properly handle sentences that use straight double quotes" in {
     val document = """start blah blah \u0022Nutrition and hydration will be taken away.\u0022 blah blah"""
     val correct = """\u0022Nutrition and hydration will be taken away.\u0022"""
@@ -159,7 +158,6 @@ retiring after 30 years in Congress."""
     var result = prep.prepare()
     assert(result == correct)
   }
-
   "preparedocument" should "properly handle sentences that use unicode curled double quotes" in {
     val document = "start blah blah \u201cNutrition and hydration will be taken away.\u201d blah blah"
     val correct = "\u201cNutrition and hydration will be taken away.\u201d"
@@ -167,6 +165,18 @@ retiring after 30 years in Congress."""
     var result = prep.prepare()
     assert(result == correct)
   }
+  "preparedocument" should "properly handle sentences that use unicode left and right single quotes" in {
+    val document = "start blah blah \u2018Nutrition and hydration will be taken away.\u2019 blah blah"
+    val correct = "\u2018Nutrition and hydration will be taken away.\u2019"
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("-----")
+    assert(result == correct)
+  }
+
 
 
   /*
@@ -257,11 +267,24 @@ Mr. Jeffries’s supporters echoed
     var previous = List("-LRB-","-LCB-","''")
     assert(prep.getSentenceAdditionalStartCharacters(previous) == Some("("))
   }
+  "getSentenceAdditionalStartCharacters" should "accept [`, blah, blah, start] and return '\u2018'" in {
+    var prep = new PrepareDocument("dummy")
+    var previous = List("`", "blah", "blah", "start")
+    assert(prep.getSentenceAdditionalStartCharacters(previous) == Some("\u2018"))
+  }
 
   /*
    * Testing getSentenceStarterPattern
    */
-
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(16) for a string that starts with a left single quote" in {
+    val textblock = "start blah blah \u2018Nutrition and hydration will be taken away.\u2019 blah blah"
+    var prep = new PrepareDocument("This is a dummy document")
+    //prep.setDebug()
+    var start_token = "Nutrition"
+    var previous_chars = "\u2018"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 16)
+  }
   "getStartIndexWithAdditionalStartCharacters" should "return None if the text block is shorter that the string you are searching for" in {
     var prep = new PrepareDocument("This is a dummy document")
     var start_token = "Somethinglong"
@@ -295,15 +318,22 @@ Mr. Jeffries’s supporters echoed
   }
   "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block contains with the starting string and a curved double quote as the start character" in {
     var prep = new PrepareDocument("This is a dummy document")
-    prep.setDebug()
+    //prep.setDebug()
     var start_token = "Hello"
     var textblock = """\u201cHello World"""
     var previous_chars = "\u201c"
     var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
     assert(start_index.isDefined && start_index.get == 0)
   }
-
-
+  "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block contains with the starting string and a left single quotation mark as the start character" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    //prep.setDebug()
+    var start_token = "Hello"
+    var textblock = """\u2018Hello World"""
+    var previous_chars = "\u2018"
+    var start_index: Option[Int] = prep.getStartIndexWithAdditionalStartCharacters(textblock, previous_chars, start_token)
+    assert(start_index.isDefined && start_index.get == 0)
+  }
   "getStartIndexWithAdditionalStartCharacters" should "return Some(0) if the text block starts with the starting string and a single previous characters with no spaces" in {
     var prep = new PrepareDocument("This is a dummy document")
     var start_token = "Hello"
@@ -433,5 +463,24 @@ Mr. Jeffries’s supporters echoed
     var prep = new PrepareDocument("This is a dummy document")
     assert(prep.matchTwoCharacters('\u201c','\u201d'))
   }
+  "matchTwoCharacters" should "return true if a grave ` and a left single quote ‘ are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u0060','\u2018'))
+  }
+  "matchTwoCharacters" should "return true if a left single quote ‘ and a grave ` are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u0060','\u2018'))
+  }
+  "matchTwoCharacters" should "return true if an apostrophe ' and a right single quote ’ are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\'','\u2019'))
+  }
+  "matchTwoCharacters" should "return true if a right single quote ’ and an apostrophe ' are passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    assert(prep.matchTwoCharacters('\u2019','\''))
+  }
+
+
+
 
 }
