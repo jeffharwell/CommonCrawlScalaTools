@@ -51,7 +51,7 @@ No comments:
     assert(result == correct)
   }  
 
-  "preparedocument" should "include include only one short lines at the end of a text block" in {
+  "preparedocument" should "include only one short lines at the end of a text block" in {
     val document = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
   community based organizations, education advocacy groups and all the
   unions that endorsed Jeffries for their great assistance in bringing
@@ -68,7 +68,25 @@ No comments:
     assert(result == correct)
   }  
 
-  "prepardocument" should "not delete this text block" in {
+  "preparedocument" should "not delete this text block" in {
+    val document = """“Hakeem Jeffries just seems to be the best prepared,” said voter
+  Carla Denalli, 46, of Fort Greene. “He would work much better with                                                   
+  the other members of Congress than Charles Barron, who is always
+  combative [and] very reminiscent of the boy who cried wolf.”"""
+    val correct = """“Hakeem Jeffries just seems to be the best prepared,” said voter
+  Carla Denalli, 46, of Fort Greene. “He would work much better with                                                   
+  the other members of Congress than Charles Barron, who is always
+  combative [and] very reminiscent of the boy who cried wolf.”"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "evaluate the last dropped line not delete this text block - test 1" in {
     val document = """In case the point was lost in the moment of triumph, Mr. Jeffries
 later told reporters that “the contrast in the race was clear. I
 have a record of success and forming coalitions. These are serious
@@ -86,9 +104,38 @@ that sense throughout the day, amid light turnout in the odd June
 primary to anoint a Democrat to succeed Rep. Ed Towns, who is
 retiring after 30 years in Congress."""
     var prep = new PrepareDocument(document)
-    prep.setDebug()
+    //prep.setDebug()
     var result = prep.prepare()
-    println(result)
+    //println(result)
+    assert(result == correct)
+  }
+
+  "preparedocument" should "evaluate the last dropped line and not delete this text block - test 2" in {
+    val document = """Mr. Barron pronounced himself “the best candidate,” adding, “At
+  the risk of sounding like a sore loser, there will be no
+  congratulatory statement made because the other candidate ran a                                                      
+  smear campaign [and] showed a lack of character.”"""
+    val correct = """Mr. Barron pronounced himself “the best candidate,” adding, “At
+  the risk of sounding like a sore loser, there will be no
+  congratulatory statement made because the other candidate ran a                                                      
+  smear campaign [and] showed a lack of character.”"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "not keep the beginning and ending of this document" in {
+    val document = """ more...
+Comments are welcome. Irrelevant and abusive comments will be deleted, as will all commercial links. Comment moderation is on, so if your comment does not appear it is because I have not been at my computer (I do not do cell phone moderating).
+Newer Post"""
+    var correct ="""Comments are welcome. Irrelevant and abusive comments will be deleted, as will all commercial links. Comment moderation is on, so if your comment does not appear it is because I have not been at my computer (I do not do cell phone moderating)."""
+    var prep = new PrepareDocument(document)
+    var result = prep.prepare()
     assert(result == correct)
   }
 

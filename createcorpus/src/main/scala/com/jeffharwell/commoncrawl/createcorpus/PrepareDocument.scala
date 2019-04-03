@@ -20,7 +20,7 @@ class PrepareDocument(document: String) {
   /*
    * Deal with counting and classifying tokens
    */
-  var alpha_pattern = Pattern.compile("[A-Za-z']+")
+  var alpha_num_pattern = Pattern.compile("[A-Za-z0-9']+")
   var upper_pattern = Pattern.compile("^[A-Z].*")
   var terminator_pattern = Pattern.compile("[.!?][\"']*$")
   var openingdoublequote_pattern = Pattern.compile("``") // Tokenizer converts opening " to `` 
@@ -33,8 +33,8 @@ class PrepareDocument(document: String) {
     debug = true
   }
 
-  def count_if_alpha(t: String): Int = {
-    if (alpha_pattern.matcher(t).matches()) {
+  def count_if_alpha_num(t: String): Int = {
+    if (alpha_num_pattern.matcher(t).matches()) {
       1
     } else {
       0
@@ -48,8 +48,8 @@ class PrepareDocument(document: String) {
     }
   }
 
-  def countAlpha(tokens: ListBuffer[String]): Int = {
-    tokens.map(count_if_alpha).reduce(_ + _)
+  def countAlphaNum(tokens: ListBuffer[String]): Int = {
+    tokens.map(count_if_alpha_num).reduce(_ + _)
   }
 
   def countNumeric(tokens: ListBuffer[String]): Int = {
@@ -341,7 +341,7 @@ class PrepareDocument(document: String) {
       if (debug) println("    Accepting line because it looks like the end of the sentence for the current textblock.")
       true
     } else if (tokens.size > 5) {
-      var alpha_percent = BigDecimal(countAlpha(tokens))/tokens.size
+      var alpha_percent = BigDecimal(countAlphaNum(tokens))/tokens.size
       if (alpha_percent > .7) {
         var numeric_percent = BigDecimal(countNumeric(tokens))/tokens.size
         if (numeric_percent < .2) {
@@ -386,13 +386,29 @@ class PrepareDocument(document: String) {
     var builder = StringBuilder.newBuilder 
     var textblock: ListBuffer[String] = ListBuffer()
     var in_textblock: Boolean = false
+    var last_dropped_line: Option[String] = None
+
+    // a little helper function.
+    // This is a bit subtle, if the last line that we dropped looks like it could be the start
+    // of a text block (i.e. it begins with a capital letter) then throw it onto the front of
+    // the current textblock we are evaluating. Otherwise just include all of the non-dropped lines
+    // which are in the builder.
+    def buildTextBlock(last_dropped_line: Option[String], string_builder: StringBuilder): String = {
+      if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).matches()) {
+        if (debug) println("Including last dropped line")
+        if (debug) println("    "+last_dropped_line.get)
+        last_dropped_line.get + "\n" + builder.toString()
+      } else {
+        builder.toString()
+      }
+    }
+
     for (line <- document.split("\r?\n")) { // maybe a bit simplistic ... but it matches
                                             // matches the LineIterator class from Source.scala, although
                                             // using the much slower Regexp split.
                                             // https://github.com/scala/scala/blob/2.8.x/src/library/scala/io/Source.scala
       // First see if we are keeping the line
       if (keep_line(line, in_textblock)) {
-
         // Build the hash for the line, used later to detect highly duplicate document
         hashes += md5HashString(line)
         if (builder.length == 0) {
@@ -409,7 +425,7 @@ class PrepareDocument(document: String) {
           // We found the end of a sentenc, write out the text block
           // and start a new one
           if (debug) println("---Is sentence ending")
-          var cleaned: Option[String] = cleanTextblock(builder.toString())
+          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
           // the foreach will only run if there is a value in the option
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
@@ -417,13 +433,17 @@ class PrepareDocument(document: String) {
           cleaned.foreach(tb => textblock.append(tb))
           builder = StringBuilder.newBuilder
           in_textblock = false
+          // Since we just processed a text block without dropping a line go ahead and clear
+          // the last_dropped_line since we know it will not apply to the next text block
+          // we are starting on.
+          last_dropped_line = None
         }
       } else {
         // We are dropping a line, the text block ends here
         if (builder.length > 0) {
-          if (debug) println("We dropped a line, ending the text block, processing remaining text in the string builder")
           // if there is anything in the buffer
-          var cleaned: Option[String] = cleanTextblock(builder.toString())
+          if (debug) println("We dropped a line, ending the text block, processing remaining text in the string builder")
+          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
           if (debug) {
             if (cleaned.isDefined) {
               println("Cleaner returned content, whatever remained in the string builder did not contain a complete sentence.")
@@ -439,6 +459,17 @@ class PrepareDocument(document: String) {
           cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
           builder = StringBuilder.newBuilder
           in_textblock = false
+        }
+        // We are dropping this line. Let's see if we might want to keep it for the next 
+        // text block
+        if (upper_pattern.matcher(line).matches()) {
+          // Hmm, could be a short or complex sentence that is actually the start
+          // of the next text block, keep it just in case.
+          if (debug) println("Setting last_dropped_line")
+          last_dropped_line = Some(line)
+        } else {
+          // Probably not useful, don't keep it around
+          last_dropped_line = None
         }
       }
     }
