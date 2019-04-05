@@ -245,71 +245,99 @@ class PrepareDocument(document: String) {
     }
   }
 
-  def reverseTail(l: ListBuffer[String]): ListBuffer[String] = {
-    l.slice(0, l.length-1)
-  }
+  // This function looks for any valid "additional characters" that may occur after the 
+  // sentence ending punctuation mark (., ?, or !). These include square brackets, round 
+  // brackets, and double quotes (including unicode closing quote) and single quotes (including
+  // unicode closing single quote).
+  def adjustIndexForAdditionalCharacters(textblock: String, ending_index: Int): Int = {
+    var valid_additional_ending_characters = List('\u201d','\u2019','"','\'','\u2019',']',')')
+    var search_index = ending_index + 1
 
-  def findSentenceEndTokenIndex(tokens: ListBuffer[String], previous_token: String = ""): Option[Pattern] = {
-    var t = tokens.last
-    if (terminator_pattern.matcher(t).matches()) {
-      if (debug) println(s"Found valid sentence ending token ${t}")
-      if (closingdoublequote_pattern.matcher(previous_token).matches()) {
-        // scala bug, escapes don't work in string interpolation :(
-        // we also want to match the unicode curly closing quote ” which is \u201d
-        Some(Pattern.compile("\\"+t+"\\s?[\"\u201d]"))
-      } else if (singlequote_pattern.matcher(previous_token).matches()) {
-        Some(Pattern.compile("\\"+t+"\\s?['`\u2018\u2019]"))
+    def findNewIndex(ending_index: Int, search_index: Int): Int = {
+      if (search_index >= textblock.length) {
+        // We just overran the end of the string, return whatever we may have found
+        ending_index
+      } else if (valid_additional_ending_characters.exists(_ == textblock(search_index))) {
+        // this could be a contender, set it as the next ending and keep looking
+        findNewIndex(search_index, search_index + 1)
+      } else if (' ' == textblock(search_index)) {
+        // it is a space, evaluate the next character, but don't treat this as a potential
+        // end of the sentence
+        findNewIndex(ending_index, search_index + 1)
       } else {
-        // Every Possible Sentence Ending (!.?) will need to be escaped in the regular
-        // expression
-        Some(Pattern.compile("\\"+t))
+        // end of the road. it is not a space or additional character, the sentence ends here
+        ending_index
       }
-    } else if (tokens.length > 1) {
-      findSentenceEndTokenIndex(reverseTail(tokens), t)
+    }
+    findNewIndex(ending_index, search_index)
+  }
+
+  // Returns true if the character before the index is a period, false otherwise
+  def hasPeriodPrevious(textblock: String, current_index: Int): Boolean = {
+    if (current_index == 0) {
+      false
+    } else if (textblock(current_index - 1) == '.') {
+      true
     } else {
-      None
+      false
     }
   }
 
-  def getIndexOfPattern(pattern: Pattern, textblock: String): Option[Int] = {
-    var matcher = pattern.matcher(textblock)
-    var end_index = -1
-
-    // Go until we hit the last match, that should be the sentence terminator
-    // get the index at the end of the match
-    while (matcher.find()) {
-      end_index = matcher.end()
-      if (debug) println("Found a match at index: "+matcher.end().toString)
-    }
-    if (end_index >= 0 ) {
-      Some(end_index)
+  // Returns true if the next charcater after the index is a period, false otherwise
+  def hasPeriodNext(textblock: String, current_index: Int): Boolean = {
+    if (current_index + 1 >= textblock.length) {
+      // we are already at the end of the sentence, so no
+      false
+    } else if (textblock(current_index + 1) == '.') {
+      true
     } else {
-      if (debug) println(s"Could not find a sentence ending matching ${pattern}")
-      None
+      false
     }
   }
 
-  def findSentenceEndIndex(textblock: String, tokens: ListBuffer[String]): Option[Int] = {
-    var token_pattern: Option[Pattern] = findSentenceEndTokenIndex(tokens)  
-    if (token_pattern.isDefined) {
-      if (debug) println(s"Searching Ending Pattern: ${token_pattern.get}")
-      var end_of_sentence = getIndexOfPattern(token_pattern.get, textblock)
-      end_of_sentence
-    } else {
-      // No sentence ending was found
+  // Look through the textblock backwards, character by character, and return the index that marks the end
+  // of the last sentence in the textblock..
+  def findSentenceEndIndex(textblock: String): Option[Int] = {
+    if (textblock.length == 0) {
       None
     }
+    def findIndex(textblock: String, index: Int): Option[Int] = {
+      if (index == 0) {
+        // we went all the way through the sentence and didn't find anything
+        None
+      } else if (textblock(index) == '.' || textblock(index) == '?' || textblock(index) == '!') {
+        // we might have something here, do some more checks
+        if (textblock(index) == '.' && (hasPeriodPrevious(textblock, index) || hasPeriodNext(textblock, index))) {
+          // we don't except multiple periods as the end of a sentence, keep looking
+          findIndex(textblock, index - 1)
+        } else {
+          // We have a sentence ending, see if there are any additional characters to tack onto
+          // sentence (quotes, etc.)
+          // We actually return the index right after the last valid end character,
+          // so that later functions can slice with abandon
+          Some(adjustIndexForAdditionalCharacters(textblock, index))
+        }
+      } else {
+        // we found nothing, but we are not at the end yet, recurse
+        findIndex(textblock, index - 1)
+      }
+    }
+
+    findIndex(textblock, textblock.length - 1)
   }
 
+  // Clean the text block by removing anything from the beginning that does not belong to a sentence
+  // (as best we can tell) and anything from the end that does not belong to a sentence (again, as best
+  // we can tell ... a lot of this stuff isn't in complete sentences anyways.)
   def cleanTextblock(textblock: String): Option[String] = {
     var tokens = tokenize_line(textblock)
     var start: Option[Int] = findSentenceStartIndex(textblock, tokens)
     if (start.isDefined) {
       if (debug) println(s"Start index is: ${start}")
-      var end: Option[Int] = findSentenceEndIndex(textblock, tokens)
-      if (end.isDefined && start.get < end.get) {
+      var end: Option[Int] = findSentenceEndIndex(textblock)
+      if (end.isDefined && start.get <= end.get) {
         if (debug) println(s"End index is: ${end}")
-        Some(textblock.slice(start.get, end.get))
+        Some(textblock.slice(start.get, end.get + 1))
       } else {
         if (debug && end.isDefined) println(s"Found end ${end} but it is less than start ${start}, discarding block.")
         if (debug && !end.isDefined) println("Did not found a valid sentence ending. Discarding block.")
@@ -364,8 +392,14 @@ class PrepareDocument(document: String) {
   def detect_sentence_ending(line: String): Boolean = {
     var last = line.takeRight(1)
     var penultimate = line.takeRight(2).take(1)
+    var antipenultimate = line.takeRight(3).take(1)
     if (last == "." || last == "?" || last == "!") {
-      true
+      if (line.takeRight(3) == "..") {
+        // We don't accept .. as the valid end of a sentence
+        false
+      } else {
+        true
+      }
     } else if (last == "'" || last == "\"" || last == "\u201D") {
       if (debug) println("Found a quote")
       if (penultimate == "." || penultimate == "?" || penultimate == "!") {
@@ -390,11 +424,11 @@ class PrepareDocument(document: String) {
 
     // a little helper function.
     // This is a bit subtle, if the last line that we dropped looks like it could be the start
-    // of a text block (i.e. it begins with a capital letter) then throw it onto the front of
-    // the current textblock we are evaluating. Otherwise just include all of the non-dropped lines
-    // which are in the builder.
+    // of a text block (i.e. it begins with a capital letter and the actual text block does not) 
+    // then throw it onto the front of the current textblock we are evaluating. Otherwise just 
+    // include all of the non-dropped lines which are in the builder.
     def buildTextBlock(last_dropped_line: Option[String], string_builder: StringBuilder): String = {
-      if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).matches()) {
+      if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).matches() && !upper_pattern.matcher(builder.toString()).matches()) {
         if (debug) println("Including last dropped line")
         if (debug) println("    "+last_dropped_line.get)
         last_dropped_line.get + "\n" + builder.toString()

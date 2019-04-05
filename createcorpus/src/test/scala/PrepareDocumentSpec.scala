@@ -26,7 +26,7 @@ class PrepareDocumentSpec extends FlatSpec {
 SHARE: Email ThisBlogThis!Share to TwitterShare to FacebookShare to Pinterest
 No comments:
 """
-    val correct = ""
+    val correct = "SHARE: Email ThisBlogThis!"
     var prep = new PrepareDocument(document)
     //prep.setDebug()
     var result = prep.prepare()
@@ -128,6 +128,45 @@ retiring after 30 years in Congress."""
     //println("-----")
     assert(result == correct)
   }
+
+  "preparedocument" should "not include a dropped starting line if the non-dropped line is the beginning of a sentence / starts with a capital letter" in {
+    val document = """EDUCATE! ORGANIZE!! MOBILIZE!!!
+These are the three pillars on which Ed Notes is founded – providing information on current ed issues, organizing activities around fighting for public education in NYC and beyond and exposing the motives behind the education deformers. We are part of a tiny band of resisters. Nothing will change unless YOU GET INVOLVED IN THE STRUGGLE!"""
+    val correct = """These are the three pillars on which Ed Notes is founded – providing information on current ed issues, organizing activities around fighting for public education in NYC and beyond and exposing the motives behind the education deformers. We are part of a tiny band of resisters. Nothing will change unless YOU GET INVOLVED IN THE STRUGGLE!"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "not accept text that ends in two or more periods as a complete sentence" in {
+    var document = """MORE Endorses National Resolution on Super High Stakes Issue T.."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    assert(result == "")
+  }
+
+  "preparedocument" should "not keep a fragment that ends in two or more periods on the end of a text block" in {
+    var document = """Be Warned, Avoid This School At All Costs.
+One of the worst schools for teachers to find themselves in is William Cullen Bryant High School in Queens. This school has one of the l..."""
+    var correct = """Be Warned, Avoid This School At All Costs.
+One of the worst schools for teachers to find themselves in is William Cullen Bryant High School in Queens."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
+
+
 
   "preparedocument" should "not keep the beginning and ending of this document" in {
     val document = """ more...
@@ -276,17 +315,15 @@ Newer Post"""
   "getSentencEndTokenIndex" should "handle a period and a double quote" in {
     var prep = new PrepareDocument("This is a dummy document")
     var sentence = """"This is my test quote.""""
-    var tokens = prep.tokenize_line(sentence)
-    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(sentence.length))
+    assert(prep.findSentenceEndIndex(sentence) == Some(sentence.length - 1))
   }
   "getSentencEndTokenIndex" should "handle a period and a unicode closing quote" in {
     var prep = new PrepareDocument("This is a dummy document")
     var sentence = """have a record of success and forming coalitions. These are serious
 times and Congress is a serious job.”
-Mr. Jeffries’s supporters echoed
+Mr Jeffries’s supporters echoed
 """
-    var tokens = prep.tokenize_line(sentence)
-    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(104))
+    assert(prep.findSentenceEndIndex(sentence) == Some(103))
   }
 
 
@@ -526,6 +563,69 @@ Mr. Jeffries’s supporters echoed
     var prep = new PrepareDocument("This is a dummy document")
     assert(prep.matchTwoCharacters('\u2019','\''))
   }
+
+  //
+  // Testing the adjacent period detection functions
+  //
+  "hasPeriodPrevious" should "return true if the string has a period previous to the index passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello.."
+    assert(prep.hasPeriodPrevious(a, 6))
+  }
+  "hasPeriodPrevious" should "return false if the string does not have a period previous to the index passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-."
+    assert(!prep.hasPeriodPrevious(a, 6))
+  }
+  "hasPeriodPrevious" should "return false if the index passed is at the beginning of the string" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-."
+    assert(!prep.hasPeriodPrevious(a, 0))
+  }
+  "hasPeriodNext" should "return true if the string has a period after index passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello.."
+    assert(prep.hasPeriodNext(a, 5))
+  }
+  "hasPeriodNext" should "return false if the string does not have a period after the index passed" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello.-"
+    assert(!prep.hasPeriodNext(a, 5))
+  }
+  "hasPeriodNext" should "return false if the index passed is at the end of the string" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-."
+    assert(!prep.hasPeriodNext(a, a.length-1))
+  }
+
+  // Testing adjustIndexForAdditionalCharacters
+  "adjustIndexForAdditionalCharacters" should "pick up an additional valid ending character after the previously identified ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "\u201cThis is my sentence.\u201d"
+    assert(prep.adjustIndexForAdditionalCharacters(a, 20) == 21)
+  }
+  "adjustIndexForAdditionalCharacters" should "pick up two additional valid ending character after the previously identified ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "\u201cThis is my (sentence.)\u201d"
+    assert(prep.adjustIndexForAdditionalCharacters(a, 21) == 23)
+  }
+  "adjustIndexForAdditionalCharacters" should "ignore a space after the previously identified ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "\u201cThis is my (sentence. "
+    assert(prep.adjustIndexForAdditionalCharacters(a, 21) == 21)
+  }
+  "adjustIndexForAdditionalCharacters" should "pick up an additional valid ending characters after a space" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "\u201cThis is my (sentence. \u201d"
+    assert(prep.adjustIndexForAdditionalCharacters(a, 21) == 23)
+  }
+  "adjustIndexForAdditionalCharacters" should "ignore spaces when adjusting the index to include additional valid ending charcaters" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "\u201cThis is my (sentence. \u201d )"
+    assert(prep.adjustIndexForAdditionalCharacters(a, 21) == 25)
+  }
+
+
 
 
 
