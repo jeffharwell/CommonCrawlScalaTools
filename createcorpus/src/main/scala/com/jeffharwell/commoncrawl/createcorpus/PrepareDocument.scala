@@ -20,7 +20,7 @@ class PrepareDocument(document: String) {
   /*
    * Deal with counting and classifying tokens
    */
-  var alpha_num_pattern = Pattern.compile("[A-Za-z0-9']+")
+  var alpha_num_pattern = Pattern.compile("[A-Za-z0-9'`]+")
   var upper_pattern = Pattern.compile("^[A-Z].*")
   var terminator_pattern = Pattern.compile("[.!?][\"']*$")
   var openingdoublequote_pattern = Pattern.compile("``") // Tokenizer converts opening " to `` 
@@ -34,14 +34,14 @@ class PrepareDocument(document: String) {
   }
 
   def count_if_alpha_num(t: String): Int = {
-    if (alpha_num_pattern.matcher(t).matches()) {
+    if (alpha_num_pattern.matcher(t).find()) {
       1
     } else {
       0
     }
   }
   def count_if_numeric(t: String): Int = {
-    if (numeric_pattern.matcher(t).matches()) {
+    if (numeric_pattern.matcher(t).find()) {
       1
     } else {
       0
@@ -150,7 +150,7 @@ class PrepareDocument(document: String) {
 
   def findSentenceStartIndex(textblock: String, tokens: ListBuffer[String], previous_tokens: List[String] = List[String]()): Option[Int] = {
     var h = tokens.head
-    if (upper_pattern.matcher(h).matches()) {
+    if (upper_pattern.matcher(h).find()) {
       // alright, we have the token that starts the sentence, now what else could be in front that could
       // also be part of the sentence?
       var other_characters: Option[String] = getSentenceAdditionalStartCharacters(previous_tokens)
@@ -272,6 +272,26 @@ class PrepareDocument(document: String) {
     findNewIndex(ending_index, search_index)
   }
 
+  def isValidSentenceEnding(textblock: String, current_index: Int): Boolean = {
+    val valid_ending_characters = "?!"
+    val invalid_endings = List("mr","ms","sr","jr")
+    if (valid_ending_characters contains textblock(current_index)) {
+      true  
+    } else if (textblock(current_index) == '.') {
+      if (hasPeriodPrevious(textblock, current_index) || hasPeriodNext(textblock, current_index)) {
+        false
+      } else if (current_index > 1 && (invalid_endings contains textblock.slice(current_index - 2, current_index).toLowerCase)) {
+        false
+      } else if (current_index > 1 && textblock(current_index - 2) == ' ') {
+        false
+      } else {
+        true
+      }
+    } else {
+      false
+    }
+  }
+
   // Returns true if the character before the index is a period, false otherwise
   def hasPeriodPrevious(textblock: String, current_index: Int): Boolean = {
     if (current_index == 0) {
@@ -295,6 +315,19 @@ class PrepareDocument(document: String) {
     }
   }
 
+  // if the next character is either a space or the end of the string return true,
+  // false otherwise
+  def hasSpaceOrEndingNext(textblock: String, current_index: Int): Boolean = {
+    if (current_index + 1 == textblock.length) {
+      true
+    } else if (textblock(current_index + 1) == ' ') {
+      true
+    } else {
+      false
+    }
+  }
+
+
   // Look through the textblock backwards, character by character, and return the index that marks the end
   // of the last sentence in the textblock..
   def findSentenceEndIndex(textblock: String): Option[Int] = {
@@ -305,17 +338,19 @@ class PrepareDocument(document: String) {
       if (index == 0) {
         // we went all the way through the sentence and didn't find anything
         None
-      } else if (textblock(index) == '.' || textblock(index) == '?' || textblock(index) == '!') {
-        // we might have something here, do some more checks
-        if (textblock(index) == '.' && (hasPeriodPrevious(textblock, index) || hasPeriodNext(textblock, index))) {
-          // we don't except multiple periods as the end of a sentence, keep looking
+      //} else if (textblock(index) == '.' || textblock(index) == '?' || textblock(index) == '!') {
+      } else if (isValidSentenceEnding(textblock, index)) {
+        // We have a sentence ending, see if there are any additional characters to tack onto
+        // sentence (quotes, etc.)
+        var new_index = adjustIndexForAdditionalCharacters(textblock, index)
+        if (new_index == index && !hasSpaceOrEndingNext(textblock, index)) {
+          if (debug) println(s"Rejected a sentence ending at index = ${index} because it did not have a space, line ending, or valid additional characters after it")
+          // there are no additional charcters, to account for the fact that this
+          // doesn't actually seem to be the end of a sentence, reject it, and keep going
           findIndex(textblock, index - 1)
         } else {
-          // We have a sentence ending, see if there are any additional characters to tack onto
-          // sentence (quotes, etc.)
-          // We actually return the index right after the last valid end character,
-          // so that later functions can slice with abandon
-          Some(adjustIndexForAdditionalCharacters(textblock, index))
+          // Ok, the lack of space or newline is caused by valid additional characters.
+          Some(new_index)
         }
       } else {
         // we found nothing, but we are not at the end yet, recurse
@@ -370,17 +405,17 @@ class PrepareDocument(document: String) {
       true
     } else if (tokens.size > 5) {
       var alpha_percent = BigDecimal(countAlphaNum(tokens))/tokens.size
-      if (alpha_percent > .7) {
+      if (alpha_percent > .65) {
         var numeric_percent = BigDecimal(countNumeric(tokens))/tokens.size
-        if (numeric_percent < .2) {
+        if (numeric_percent < .3) {
           if (debug) println("    Accepted line")
           true
         } else {
-          if (debug) println("    Rejected line: it did not have less than 20% numeric characters")
+          if (debug) println(s"    Rejected line: it did not have less than 20% numeric characters. Percent was ${numeric_percent}")
           false
         }
       } else {
-        if (debug) println("    Rejected line: it did not have more than 70% alpha numeric characters")
+        if (debug) println(s"    Rejected line: it did not have more than 70% alpha numeric characters. Percent was ${alpha_percent}")
         false
       }
     } else {
@@ -412,6 +447,22 @@ class PrepareDocument(document: String) {
     }
   }
 
+  // This is basically a very low bar for keeping a line
+  // it has to have two tokens to rub together, and at
+  // least one of them has to be alphanumeric.
+  def keepMiddleLine(line: String): Boolean = {
+    var tokens = tokenize_line(line)
+    if (debug) println(s"   Number of tokens is ${tokens.length}")
+    if (debug) println(s"   Alpha numeric tokens is ${countAlphaNum(tokens)}")
+    if (tokens.length >= 2 && countAlphaNum(tokens) >= 1) {
+      if (debug) println("   Keeping this middle line")
+      true
+    } else {
+      if (debug) println("   Rejecting this middle line")
+      false
+    }
+  }
+
   def prepare(): String = {
     // See the API Usage Section of
     // https://nlp.stanford.edu/software/tokenizer.shtml
@@ -421,6 +472,7 @@ class PrepareDocument(document: String) {
     var textblock: ListBuffer[String] = ListBuffer()
     var in_textblock: Boolean = false
     var last_dropped_line: Option[String] = None
+    var potential_middle_line: Option[String] = None
 
     // a little helper function.
     // This is a bit subtle, if the last line that we dropped looks like it could be the start
@@ -428,7 +480,8 @@ class PrepareDocument(document: String) {
     // then throw it onto the front of the current textblock we are evaluating. Otherwise just 
     // include all of the non-dropped lines which are in the builder.
     def buildTextBlock(last_dropped_line: Option[String], string_builder: StringBuilder): String = {
-      if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).matches() && !upper_pattern.matcher(builder.toString()).matches()) {
+      //if (debug) println("Looking at:--"+string_builder.toString()+"--")
+      if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).find() && !upper_pattern.matcher(string_builder.toString()).find()) {
         if (debug) println("Including last dropped line")
         if (debug) println("    "+last_dropped_line.get)
         last_dropped_line.get + "\n" + builder.toString()
@@ -452,6 +505,10 @@ class PrepareDocument(document: String) {
           // Throw in a space if we are appending this to an existing line
           // often it seems like, in the WET archives, a new line is replacing
           // HTML code that probably generated a gap in the content
+          if (potential_middle_line.isDefined) {
+            builder.append("\n"+potential_middle_line.get)
+            potential_middle_line = None
+          }
           builder.append("\n"+line)
         }
 
@@ -465,6 +522,8 @@ class PrepareDocument(document: String) {
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           cleaned.foreach(tb => textblock.append(tb))
+          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
+          if (debug) println("*** New Textblock ***")
           builder = StringBuilder.newBuilder
           in_textblock = false
           // Since we just processed a text block without dropping a line go ahead and clear
@@ -473,10 +532,14 @@ class PrepareDocument(document: String) {
           last_dropped_line = None
         }
       } else {
-        // We are dropping a line, the text block ends here
-        if (builder.length > 0) {
-          // if there is anything in the buffer
-          if (debug) println("We dropped a line, ending the text block, processing remaining text in the string builder")
+        // We may be dropping a line, if we do then the text block ends here, but under some circumstances we won't
+        // be sure until the next line
+        if (builder.length > 0 && potential_middle_line.isDefined) {
+          // if there is anything in the buffer and we have already had one line that we thought about dropping
+          // then we drop both lines and process the text block (last_dropped_line is a line that might belong on
+          // the front of the text block, it has nothing to do with the interstitial line evaluation)
+          if (debug) println("We dropped two lines, ending the text block, processing remaining text in the string builder")
+          potential_middle_line = None
           var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
           if (debug) {
             if (cleaned.isDefined) {
@@ -485,25 +548,61 @@ class PrepareDocument(document: String) {
               println("Cleaner did not return content")
             }
           }
-
           // the foreach will only run if there is a value in the option
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
+          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
+          if (debug) println("*** New Textblock ***")
           builder = StringBuilder.newBuilder
           in_textblock = false
+        } else if (builder.length > 0 && keepMiddleLine(line)) {
+          // the line seems to be in the middle of two valid lines and it has
+          // at least two tokens and some letters
+          // Keep it and if the next line is valid we will include it and keep
+          // trucking on the text block
+          if (debug) println("  Keeping potential interstitial line")
+          potential_middle_line = Some(line)
+        } else if (builder.length > 0) {
+          // We will NOT be keeping this as a potential interstitial line (that case is caught in the previous condition)
+          // so this is the end of the text block. Go ahead and build and clean it.
+          if (debug) println("We have rejected a potential interstitial line, go ahead and build and clean the text block")
+          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
+          if (debug) {
+            if (cleaned.isDefined) {
+              println("Cleaner returned content, whatever remained in the string builder did not contain a complete sentence.")
+            } else {
+              println("Cleaner did not return content")
+            }
+          }
+          // the foreach will only run if there is a value in the option
+          // Bascially, the potential text block might not even have enough info
+          // in it to keep it, the cleaner might basically delete all the content.
+          // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
+          cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
+          
+          // Reset all the things
+          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
+          if (debug) println("*** New Textblock ***")
+          builder = StringBuilder.newBuilder
+          in_textblock = false
+          potential_middle_line = None
         }
-        // We are dropping this line. Let's see if we might want to keep it for the next 
-        // text block
-        if (upper_pattern.matcher(line).matches()) {
-          // Hmm, could be a short or complex sentence that is actually the start
-          // of the next text block, keep it just in case.
-          if (debug) println("Setting last_dropped_line")
-          last_dropped_line = Some(line)
-        } else {
-          // Probably not useful, don't keep it around
-          last_dropped_line = None
+
+        // We are dropping this line. Let's see if we might want to keep it as the start of the 
+        // next text block
+        if (!potential_middle_line.isDefined) {
+          in_textblock = false
+          if (upper_pattern.matcher(line).find()) {
+            // Hmm, could be a short or complex sentence that is actually the start
+            // of the next text block, keep it just in case.
+            if (debug) println("Setting last_dropped_line")
+            last_dropped_line = Some(line)
+          } else {
+            // Probably not useful, don't keep it around
+            last_dropped_line = None
+          }
         }
       }
     }
@@ -524,5 +623,6 @@ class PrepareDocument(document: String) {
       result_list.append(l)
     }
     result_list.mkString("\n")
+    //result_list.mkString("\n--\n")
   }
 }

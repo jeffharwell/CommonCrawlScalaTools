@@ -21,12 +21,15 @@ class PrepareDocumentSpec extends FlatSpec {
     assert(result == correct)
   }
 
-  "preparedocument" should "not throw a java.util.NoSuchElementException when processing this text" in {
+  "preparedocument" should "not throw a java.util.NoSuchElementException when processing this text, but instead return an empty string" in {
     val document = """Leftists
 SHARE: Email ThisBlogThis!Share to TwitterShare to FacebookShare to Pinterest
 No comments:
 """
-    val correct = "SHARE: Email ThisBlogThis!"
+    //val correct = "SHARE: Email ThisBlogThis!"
+    // If we are requiring a space or line ending (or a few other valid characters) after a sentence terminator
+    // then this block doesn't qualify at all.
+    val correct = ""
     var prep = new PrepareDocument(document)
     //prep.setDebug()
     var result = prep.prepare()
@@ -53,17 +56,20 @@ No comments:
 
   "preparedocument" should "include only one short lines at the end of a text block" in {
     val document = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
-  community based organizations, education advocacy groups and all the
-  unions that endorsed Jeffries for their great assistance in bringing
-  vouchers to NYS!
-  Yes, I'm disgusted."""
+community based organizations, education advocacy groups and all the
+unions that endorsed Jeffries for their great assistance in bringing
+vouchers to NYS!
+Yes, I'm disgusted."""
     val correct = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
-  community based organizations, education advocacy groups and all the
-  unions that endorsed Jeffries for their great assistance in bringing
-  vouchers to NYS!"""
+community based organizations, education advocacy groups and all the
+unions that endorsed Jeffries for their great assistance in bringing
+vouchers to NYS!
+Yes, I'm disgusted."""
     var prep = new PrepareDocument(document)
     //prep.setDebug()
     var result = prep.prepare()
+    //println(document)
+    //println("--")
     //println(result)
     assert(result == correct)
   }  
@@ -157,6 +163,28 @@ One of the worst schools for teachers to find themselves in is William Cullen Br
     var correct = """Be Warned, Avoid This School At All Costs.
 One of the worst schools for teachers to find themselves in is William Cullen Bryant High School in Queens."""
     var prep = new PrepareDocument(document)
+    prep.setDebug()
+    var result = prep.prepare()
+    println("-----")
+    println(result)
+    println("--")
+    println(correct)
+    println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "keep this as a complete text block even though the middle line does not qualify to be kept" in {
+    var document = """“I am committed to the public school system, and we will support                                                     
+public schools and parochials schools,” he said. He also said he would work to help homeowners who are at risk of    
+foreclosure. East New York, Canarsie and Bedford-Stuyvesant — all
+within the Eighth Congressional District — are particularly hard
+hit, he said."""
+    var correct = """“I am committed to the public school system, and we will support                                                     
+public schools and parochials schools,” he said. He also said he would work to help homeowners who are at risk of    
+foreclosure. East New York, Canarsie and Bedford-Stuyvesant — all
+within the Eighth Congressional District — are particularly hard
+hit, he said."""
+    var prep = new PrepareDocument(document)
     //prep.setDebug()
     var result = prep.prepare()
     //println("-----")
@@ -166,7 +194,94 @@ One of the worst schools for teachers to find themselves in is William Cullen Br
     assert(result == correct)
   }
 
+  "preparedocument" should "keep this as a complete text block even though the middle line does not qualify to be kept - test 2" in {
+    var document = """Assemblyman Alec Brook-Krasny, who represents Brighton Beach and
+its large Russian population, said Mr. Barron’s rhetoric on Israel
+helped earn Mr. Jeffries strong support among Russian Jews.
+“I’ve never seen such strong numbers,” said Mr. Brook-Krasny. “We
+have some election districts with votes of 44–0, 115–2, 32–2. It’s
+because, one, we had a great candidate, but also, two, that
+Charles Barron has opinions about Israel that the Russian Jews do
+not find suitable for Israel. It’s like he’s a foreign enemy.”"""
+    var correct = """Assemblyman Alec Brook-Krasny, who represents Brighton Beach and
+its large Russian population, said Mr. Barron’s rhetoric on Israel
+helped earn Mr. Jeffries strong support among Russian Jews.
+“I’ve never seen such strong numbers,” said Mr. Brook-Krasny. “We
+have some election districts with votes of 44–0, 115–2, 32–2. It’s
+because, one, we had a great candidate, but also, two, that
+Charles Barron has opinions about Israel that the Russian Jews do
+not find suitable for Israel. It’s like he’s a foreign enemy.”"""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("--")
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
 
+  "preparedocument" should "not add a rejected interstitial line or previously dropped line onto the beginning of the next textblock if that textblock starts with a capital letter" in {
+    val document = """Yes, I'm disgusted.
+Read the article below:
+June 27, 2012, 1:03 am Comment
+Hakeem Jeffries Defeats Charles Barron in
+Bitter Democratic Primary
+By GERSH
+KUNTZMAN
+Gersh Kuntzman (left) and
+Matthew J. Perlman Assemblyman
+Hakeem Jeffries beat Councilman Charles Barron for the
+Democratic nomination for Congress yesterday, tantamount to
+election in deeply Democratic Brooklyn."""
+    var correct = """Yes, I'm disgusted.
+Gersh Kuntzman (left) and
+Matthew J. Perlman Assemblyman
+Hakeem Jeffries beat Councilman Charles Barron for the
+Democratic nomination for Congress yesterday, tantamount to
+election in deeply Democratic Brooklyn."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("--")
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "not include a dropped initial line if the start of the textblock is already a potential start of a sentence" in {
+    val document = """KUNTZMAN
+Gersh Kuntzman (left) and
+Matthew J. Perlman Assemblyman
+Hakeem Jeffries beat Councilman Charles Barron for the
+Democratic nomination for Congress yesterday, tantamount to
+election in deeply Democratic Brooklyn."""
+    var correct = """Gersh Kuntzman (left) and
+Matthew J. Perlman Assemblyman
+Hakeem Jeffries beat Councilman Charles Barron for the
+Democratic nomination for Congress yesterday, tantamount to
+election in deeply Democratic Brooklyn."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("--")
+    //println(correct)
+    //println("-----")
+    assert(result == correct)
+  }
+
+  "preparedocument" should "not consider a single letter and a period as a valid sentence ending" in {
+    val document = "Harry Reid: James Comey is the New J. Edgar Hoover"
+    val correct = ""
+    var prep = new PrepareDocument(document)
+    var result = prep.prepare()
+    assert(result == correct)
+  }
 
   "preparedocument" should "not keep the beginning and ending of this document" in {
     val document = """ more...
@@ -178,10 +293,39 @@ Newer Post"""
     assert(result == correct)
   }
 
+  "preparedocument" should "not see a period in a URL as a valid sentence ending" in {
+    val document = """Great Post on Teacher Quality at the Morton School                                                                   
+I'm very tired of the myth that schools are bursting at the seams with apathetic, unskilled, surly, child-hating losers who can't get jobs doing anything else. I recently figured that, counting high school and college where one encounters many teachers in the course of a year, I had well over 100 teachers in my lifetime, and I can only say that one or two truly had no place being in a classroom.More at: http://themortonschool.blogspot.com/2009/07/its-teachers-stupidright.html
+The Randi Sellout Tour
+"""
+    val correct = """Great Post on Teacher Quality at the Morton School                                                                   
+I'm very tired of the myth that schools are bursting at the seams with apathetic, unskilled, surly, child-hating losers who can't get jobs doing anything else."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    assert(result == correct)
+  }
+
+  "preparedocument" should "reject middle lines that are 100% non-alphanumeric" in {
+    val document = """Outrage on the Page | notes from a teacher educator                                                                  
+The PARCC Test: Exposed [excerpts deleted under legal threat from Parcc]                                             
+-                                                                                                                    
+The author of this blog posting is a public school teacher who will remain anonymous. I will not reveal my …
+"""
+    val correct = """The author of this blog posting is a public school teacher who will remain anonymous."""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println(result)
+    //println("---")
+    //println(correct)
+    assert(result == correct)
+  }
+
+
   /*
    * Pulling junk off the end of a text block
    */
-  /*
   "preparedocument" should "remove non sentence material from the end of a text block" in {
     val document = """On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather. What we instantly got was a freak sh"""
     var correct = "On the eve of the election last month my wife Judith and I were driving home late in the afternoon and turned on the radio for the traffic and weather."
@@ -195,7 +339,6 @@ Newer Post"""
 
     assert(result == correct)
   }
-  */
 
   /*
    * Dealing with Strange Ending Quotes
@@ -598,6 +741,24 @@ Mr Jeffries’s supporters echoed
     assert(!prep.hasPeriodNext(a, a.length-1))
   }
 
+  //
+  // Testing the function hasSpaceOrEndingNext()
+  "hasSpaceOrEndingNext" should "return true if the index passed is at the end of the string" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-."
+    assert(prep.hasSpaceOrEndingNext(a, a.length-1))
+  }
+  "hasSpaceOrEndingNext" should "return true if the index passed has a space at index + 1" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-. World"
+    assert(prep.hasSpaceOrEndingNext(a, 6))
+  }
+  "hasSpaceOrEndingNext" should "return false if the index passed does not have a space at index + 1" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "hello-.-World"
+    assert(!prep.hasSpaceOrEndingNext(a, 6))
+  }
+
   // Testing adjustIndexForAdditionalCharacters
   "adjustIndexForAdditionalCharacters" should "pick up an additional valid ending character after the previously identified ending" in {
     var prep = new PrepareDocument("This is a dummy document")
@@ -624,6 +785,65 @@ Mr Jeffries’s supporters echoed
     var a = "\u201cThis is my (sentence. \u201d )"
     assert(prep.adjustIndexForAdditionalCharacters(a, 21) == 25)
   }
+
+  // Testing valid sentence endings
+  "isValidSentenceEnding" should "reject Mr. as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Mr."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject Ms. as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Ms."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject Jr. as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Jr."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject Sr. as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Sr."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject a period with a period after as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Sr.."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject a period with a period before as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Sr.."
+    assert(!prep.isValidSentenceEnding(a, 7))
+  }
+  "isValidSentenceEnding" should "reject any period and a single letter as valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test "
+    var letters: Array[String] = "abcdefghijklmnoprstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split("")
+    letters.foreach(x => assert(!prep.isValidSentenceEnding(a+x+".", 6)))
+  }
+  "isValidSentenceEnding" should "reject a non-sentence ending character" in {
+    var prep = new PrepareDocument("dummy")
+    var a = "test"
+    assert(!prep.isValidSentenceEnding(a, 2))
+  }
+  "isValidSentenceEnding" should "accept a question mark as an ending character" in {
+    var prep = new PrepareDocument("dummy")
+    var a = "test?"
+    assert(prep.isValidSentenceEnding(a, 4))
+  }
+  "isValidSentenceEnding" should "accept an exclamation mark as an ending character" in {
+    var prep = new PrepareDocument("dummy")
+    var a = "test!"
+    assert(prep.isValidSentenceEnding(a, 4))
+  }
+
+
+
+
+
+
 
 
 
