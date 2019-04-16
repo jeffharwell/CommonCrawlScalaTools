@@ -27,6 +27,7 @@ class PrepareDocument(document: String) {
   var closingdoublequote_pattern = Pattern.compile("''") // Tokenizer converts closing " to ''
   var singlequote_pattern = Pattern.compile("'") // Tokenizer leaves single quotes alone
   var numeric_pattern = Pattern.compile("[0-9]+")
+  var max_tokens_before_sentence_end = 70
   var debug = false
 
   def setDebug(): Unit = {
@@ -272,17 +273,39 @@ class PrepareDocument(document: String) {
     findNewIndex(ending_index, search_index)
   }
 
-  def isValidSentenceEnding(textblock: String, current_index: Int): Boolean = {
+  // Pretty Simple, if the string s ends with any of the invalid_endings in the ListBuffer
+  // it will return true, false otherwise
+  // Basically the the PTB tokenizer works through a sentence it will catch things like
+  // Mr. Ms. Jr. Rev. and other common abbreviations and consider them a distinct token,
+  // so if you pass all of the tokens that end in a period to this function as invalid_endings
+  // it will tell you if your current string ends with one of those endings
+  def endsWithInvalid(s: String, invalid_endings: ListBuffer[String]): Boolean = {
+    if (invalid_endings.length == 0) {
+      false
+    } else {
+      var ending = invalid_endings.head
+      if (s.endsWith(ending)) {
+        true
+      } else {
+        endsWithInvalid(s, invalid_endings.tail)
+      }
+    }
+  }
+
+  // Little function which evaluates the textblock at the current index to see if the current index
+  // represents a valid sentence ending. It much be passed a list buffer which contains all tokens 
+  // that end with a period but do not constitute a sentence ending.
+  // This also takes care of cases where you have multiple periods in a row or cases where there is a 
+  // single letter and a period (such as a first initial) which shouldn't be counted.
+  def isValidSentenceEnding(textblock: String, current_index: Int, invalid_endings: ListBuffer[String]): Boolean = {
     val valid_ending_characters = "?!"
-    val invalid_endings = List("mr","ms","sr","jr")
+    //val invalid_endings = List("mr","ms","sr","jr")
     if (valid_ending_characters contains textblock(current_index)) {
       true  
     } else if (textblock(current_index) == '.') {
       if (hasPeriodPrevious(textblock, current_index) || hasPeriodNext(textblock, current_index)) {
         false
-      } else if (current_index > 1 && (invalid_endings contains textblock.slice(current_index - 2, current_index).toLowerCase)) {
-        false
-      } else if (current_index > 1 && textblock(current_index - 2) == ' ') {
+      } else if (endsWithInvalid(textblock.slice(0, current_index + 1), invalid_endings)) {
         false
       } else {
         true
@@ -330,16 +353,26 @@ class PrepareDocument(document: String) {
 
   // Look through the textblock backwards, character by character, and return the index that marks the end
   // of the last sentence in the textblock..
-  def findSentenceEndIndex(textblock: String): Option[Int] = {
+  def findSentenceEndIndex(textblock: String, tokens: ListBuffer[String]): Option[Int] = {
     if (textblock.length == 0) {
       None
     }
+    def ends_with_period(x: String): Boolean = {
+      if (x.length > 1 && x(x.length - 1) == '.') {
+        true
+      } else {
+        false
+      }
+    }
+    var tokenizer_invalid_endings = tokens.filter(ends_with_period(_))
+    var other_invalid_endings = List("Ret.")
+    var invalid_endings = tokenizer_invalid_endings ++ other_invalid_endings
     def findIndex(textblock: String, index: Int): Option[Int] = {
       if (index == 0) {
         // we went all the way through the sentence and didn't find anything
         None
       //} else if (textblock(index) == '.' || textblock(index) == '?' || textblock(index) == '!') {
-      } else if (isValidSentenceEnding(textblock, index)) {
+      } else if (isValidSentenceEnding(textblock, index, invalid_endings)) {
         // We have a sentence ending, see if there are any additional characters to tack onto
         // sentence (quotes, etc.)
         var new_index = adjustIndexForAdditionalCharacters(textblock, index)
@@ -361,15 +394,29 @@ class PrepareDocument(document: String) {
     findIndex(textblock, textblock.length - 1)
   }
 
+  def findIndexOfFirstSentenceEndingToken(tokens: ListBuffer[String]): Option[Int] = {
+    var sentence_ending_tokens = List(".","!","?")
+
+    var earliest_ending_token = sentence_ending_tokens.map( x => tokens.indexOf(x)).filter(_ != -1)
+    if (earliest_ending_token.length > 0) {
+      if (debug) println(s"Earliest ending token is: ${earliest_ending_token}")
+      Some(earliest_ending_token.min)
+    } else {
+      None
+    }
+  }
+
+
   // Clean the text block by removing anything from the beginning that does not belong to a sentence
   // (as best we can tell) and anything from the end that does not belong to a sentence (again, as best
   // we can tell ... a lot of this stuff isn't in complete sentences anyways.)
   def cleanTextblock(textblock: String): Option[String] = {
     var tokens = tokenize_line(textblock)
     var start: Option[Int] = findSentenceStartIndex(textblock, tokens)
-    if (start.isDefined) {
+    var earliest_ending: Option[Int] = findIndexOfFirstSentenceEndingToken(tokens)
+    if (start.isDefined && earliest_ending.isDefined && earliest_ending.get < max_tokens_before_sentence_end) {
       if (debug) println(s"Start index is: ${start}")
-      var end: Option[Int] = findSentenceEndIndex(textblock)
+      var end: Option[Int] = findSentenceEndIndex(textblock, tokens)
       if (end.isDefined && start.get <= end.get) {
         if (debug) println(s"End index is: ${end}")
         Some(textblock.slice(start.get, end.get + 1))
@@ -379,7 +426,14 @@ class PrepareDocument(document: String) {
         None
       }
     } else {
-      if (debug) println("No valid sentence start was found, discarding block.")
+      if (!earliest_ending.isDefined) {
+        if (debug) println(s"No sentence endings at all were found in the textblock, discarding.")
+      } else if (earliest_ending.get > max_tokens_before_sentence_end) {
+        if (debug) println(s"Rejected textblock because the earlist end token occurred at token ${earliest_ending.get}, which is larger than the the maximum tokens that can occur before a sentence ending, ${max_tokens_before_sentence_end}")
+      }
+      if (!start.isDefined) {
+        if (debug) println("Rejected textblock because no valid sentence starting sequence was found")
+      }
       None
     }
   }
@@ -489,6 +543,20 @@ class PrepareDocument(document: String) {
         builder.toString()
       }
     }
+    // Check to see how many "tokens" are in a string
+    def approximateTokenCount(s: String): Int = {
+      s.split("\\s+").length
+    }
+    // Append a string to the textblock
+    def appendToTextblock(tb: ListBuffer[String], line: String): Unit = {
+      if (approximateTokenCount(line) > 4) {
+        if (debug) println("Line/textblock has more than 4 tokens, including it")
+        tb.append(line)
+      } else {
+        if (debug) println("Line/textblock has 4 or less tokens, discarding")
+      }
+    }
+
 
     for (line <- document.split("\r?\n")) { // maybe a bit simplistic ... but it matches
                                             // matches the LineIterator class from Source.scala, although
@@ -521,7 +589,7 @@ class PrepareDocument(document: String) {
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
-          cleaned.foreach(tb => textblock.append(tb))
+          cleaned.foreach(tb => appendToTextblock(textblock, tb))
           if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
           if (debug) println("*** New Textblock ***")
           builder = StringBuilder.newBuilder
@@ -552,7 +620,8 @@ class PrepareDocument(document: String) {
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
-          cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
+          //cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
+          cleaned.foreach(tb => appendToTextblock(textblock, tb))
           if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
           if (debug) println("*** New Textblock ***")
           builder = StringBuilder.newBuilder
@@ -580,7 +649,7 @@ class PrepareDocument(document: String) {
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
-          cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
+          cleaned.foreach(tb => appendToTextblock(textblock, tb)) // the foreach will only run if there is a value
           
           // Reset all the things
           if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
@@ -614,7 +683,7 @@ class PrepareDocument(document: String) {
       if (debug) println("The document did not end on a complete sentence.")
       // run the cleaner
       var cleaned: Option[String] = cleanTextblock(builder.toString())
-      cleaned.foreach(tb => textblock.append(tb))
+      cleaned.foreach(tb => appendToTextblock(textblock, tb))
     }
 
 	if (debug) println(hashes)
@@ -623,6 +692,5 @@ class PrepareDocument(document: String) {
       result_list.append(l)
     }
     result_list.mkString("\n")
-    //result_list.mkString("\n--\n")
   }
 }

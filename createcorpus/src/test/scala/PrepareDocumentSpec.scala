@@ -1,5 +1,7 @@
 import com.jeffharwell.commoncrawl.createcorpus.PrepareDocument
+import scala.collection.mutable.ListBuffer
 import org.scalatest._
+
 
 class PrepareDocumentSpec extends FlatSpec {
 
@@ -63,8 +65,7 @@ Yes, I'm disgusted."""
     val correct = """Charles Barron didn't lose the race. PUBLIC Education lost today. Remember to say a BIG THANK YOU to the Working Families Party,
 community based organizations, education advocacy groups and all the
 unions that endorsed Jeffries for their great assistance in bringing
-vouchers to NYS!
-Yes, I'm disgusted."""
+vouchers to NYS!"""
     var prep = new PrepareDocument(document)
     //prep.setDebug()
     var result = prep.prepare()
@@ -163,13 +164,13 @@ One of the worst schools for teachers to find themselves in is William Cullen Br
     var correct = """Be Warned, Avoid This School At All Costs.
 One of the worst schools for teachers to find themselves in is William Cullen Bryant High School in Queens."""
     var prep = new PrepareDocument(document)
-    prep.setDebug()
+    //prep.setDebug()
     var result = prep.prepare()
-    println("-----")
-    println(result)
-    println("--")
-    println(correct)
-    println("-----")
+    //println("-----")
+    //println(result)
+    //println("--")
+    //println(correct)
+    //println("-----")
     assert(result == correct)
   }
 
@@ -235,8 +236,7 @@ Matthew J. Perlman Assemblyman
 Hakeem Jeffries beat Councilman Charles Barron for the
 Democratic nomination for Congress yesterday, tantamount to
 election in deeply Democratic Brooklyn."""
-    var correct = """Yes, I'm disgusted.
-Gersh Kuntzman (left) and
+    var correct = """Gersh Kuntzman (left) and
 Matthew J. Perlman Assemblyman
 Hakeem Jeffries beat Councilman Charles Barron for the
 Democratic nomination for Congress yesterday, tantamount to
@@ -322,6 +322,23 @@ The author of this blog posting is a public school teacher who will remain anony
     assert(result == correct)
   }
 
+  "preparedocument" should "reject this text block as being too long to only have one valid sentence ending" in {
+    val document = """January 10th, 2014 | Tags: Boehner, death penalty, filibuster, ObamaCare, property rights, quotas, RINOs, Supreme Court | Category: Constitution, Courts, Legal, Crime, Criminal Justice, Elections, Campaigns, Healthcare, public health, Politics, Race, Ethnicity, The Left, The Right | Leave a comment widget @ surfing-waves.com The politically motivated, wrongful prosecution of Rick Renzi
+New AG Sessions and Congress Must Investigate DOJ Corruption in the Case of Rep. Rick Renzi
+Rick Renzi Puts Together Top Legal Team to Appeal Hidden Evidence of FBI Agent's Corruption
+Judge Unbelievably Refuses to Grant a Retrial for Former Rep. Renzi Despite Finding Rampant Prosecutorial Wrongdoing
+Bombshell: New Evidence Reveals Prosecutor Corruption in Trial Against Former Congressman Rick Renzi
+Time For a Congressional Investigation: Shattering New Developments of Corruption in Rep. Renzi Trial
+Judge Unravels Illegal Activity by Prosecution That Ensured a Conviction of Renzi — But Will he do Anything About it?"""
+    val correct = ""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println(result)
+    //println("---")
+    //println(correct)
+    assert(result == correct)
+  }
 
   /*
    * Pulling junk off the end of a text block
@@ -406,6 +423,22 @@ The author of this blog posting is a public school teacher who will remain anony
     assert(result == correct)
   }
 
+  "preparedocument" should "return an empty string when processing this text snippet" in {
+    val document = """Ted Cruz
+(54)
+Ted Cruz. Ted Cruz Rally North Idaho
+(1)
+Ted Nugent
+(1)"""
+    val correct = ""
+    var prep = new PrepareDocument(document)
+    //prep.setDebug()
+    var result = prep.prepare()
+    //println("-----")
+    //println(result)
+    //println("-----")
+    assert(result == correct)
+  }
 
 
   /*
@@ -458,7 +491,8 @@ The author of this blog posting is a public school teacher who will remain anony
   "getSentencEndTokenIndex" should "handle a period and a double quote" in {
     var prep = new PrepareDocument("This is a dummy document")
     var sentence = """"This is my test quote.""""
-    assert(prep.findSentenceEndIndex(sentence) == Some(sentence.length - 1))
+    var tokens = prep.tokenize_line(sentence)
+    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(sentence.length - 1))
   }
   "getSentencEndTokenIndex" should "handle a period and a unicode closing quote" in {
     var prep = new PrepareDocument("This is a dummy document")
@@ -466,7 +500,8 @@ The author of this blog posting is a public school teacher who will remain anony
 times and Congress is a serious job.”
 Mr Jeffries’s supporters echoed
 """
-    assert(prep.findSentenceEndIndex(sentence) == Some(103))
+    var tokens = prep.tokenize_line(sentence)
+    assert(prep.findSentenceEndIndex(sentence, tokens) == Some(103))
   }
 
 
@@ -790,64 +825,92 @@ Mr Jeffries’s supporters echoed
   "isValidSentenceEnding" should "reject Mr. as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Mr."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
   }
   "isValidSentenceEnding" should "reject Ms. as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Ms."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
   }
   "isValidSentenceEnding" should "reject Jr. as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Jr."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
   }
   "isValidSentenceEnding" should "reject Sr. as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Sr."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
   }
   "isValidSentenceEnding" should "reject a period with a period after as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Sr.."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
   }
   "isValidSentenceEnding" should "reject a period with a period before as a valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test Sr.."
-    assert(!prep.isValidSentenceEnding(a, 7))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
+  }
+  "isValidSentenceEnding" should "reject Ret. as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "Test Rev."
+    var tokens = prep.tokenize_line(a)
+    //println(tokens)
+    assert(!prep.isValidSentenceEnding(a, 7, tokens))
+  }
+  "isValidSentenceEnding" should "reject first initial as a valid ending" in {
+    var prep = new PrepareDocument("This is a dummy document")
+    var a = "J. R. Tolkin is a writer."
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 4, tokens))
   }
   "isValidSentenceEnding" should "reject any period and a single letter as valid ending" in {
     var prep = new PrepareDocument("This is a dummy document")
     var a = "Test "
+    var tokens = prep.tokenize_line(a)
     var letters: Array[String] = "abcdefghijklmnoprstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split("")
-    letters.foreach(x => assert(!prep.isValidSentenceEnding(a+x+".", 6)))
+    letters.foreach(x => assert(!prep.isValidSentenceEnding(a+x+".", 6, tokens+=x+".")))
   }
   "isValidSentenceEnding" should "reject a non-sentence ending character" in {
     var prep = new PrepareDocument("dummy")
     var a = "test"
-    assert(!prep.isValidSentenceEnding(a, 2))
+    var tokens = prep.tokenize_line(a)
+    assert(!prep.isValidSentenceEnding(a, 2, tokens))
   }
   "isValidSentenceEnding" should "accept a question mark as an ending character" in {
     var prep = new PrepareDocument("dummy")
     var a = "test?"
-    assert(prep.isValidSentenceEnding(a, 4))
+    var tokens = prep.tokenize_line(a)
+    assert(prep.isValidSentenceEnding(a, 4, tokens))
   }
   "isValidSentenceEnding" should "accept an exclamation mark as an ending character" in {
     var prep = new PrepareDocument("dummy")
     var a = "test!"
-    assert(prep.isValidSentenceEnding(a, 4))
+    var tokens = prep.tokenize_line(a)
+    assert(prep.isValidSentenceEnding(a, 4, tokens))
   }
-
-
-
-
-
-
-
-
-
-
-
-
+  "endsWithInvalid" should "return true if the sentence ends with one of the invalid endings in the list" in {
+    var invalid: ListBuffer[String] = new ListBuffer[String]()
+    invalid += "eone"
+    invalid += "etwo"
+    var s = "my sentence etwo"
+    var prep = new PrepareDocument("")
+    assert(prep.endsWithInvalid(s, invalid))
+  }
+  "endsWithInvalid" should "return false if the sentence does not ends with one of the invalid endings in the list" in {
+    var invalid: ListBuffer[String] = new ListBuffer[String]()
+    invalid += "eone"
+    invalid += "etwo"
+    var s = "my sentence etwo."
+    var prep = new PrepareDocument("")
+    assert(!prep.endsWithInvalid(s, invalid))
+  }
 }

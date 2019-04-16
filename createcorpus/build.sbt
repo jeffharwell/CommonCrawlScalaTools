@@ -7,7 +7,7 @@ organization := "com.jeffharwell"
 
 name := "CreateCorpus"
 
-version := "0.0.2"
+version := "0.0.3"
 publishMavenStyle := true
 
 // Spark 1.6.7 like Scala 2.10.5
