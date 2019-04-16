@@ -2,7 +2,7 @@
 
 SCALAVERSION="2.11"
 VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
-NAME="warcparser"
+NAME="createcorpus"
 ORGANIZATION="com.jeffharwell"
 K8SCRIPTBASE="~/nginx_jar_repo"
 
@@ -13,6 +13,7 @@ LOCALMAVENREPO=${HOME}/.m2/repository
 MVNLOCAL="${HOME}/.m2/repository/com/jeffharwell/${NAME}_${SCALAVERSION}"
 
 sbt package
+## turn echo back on after the sbt command (it leaves it off annoyingly)
 stty echo
 
 mvn install:install-file -Dfile=./target/scala-${SCALAVERSION}/${NAME}_${SCALAVERSION}-${VERSION}.jar -DgroupId=${ORGANIZATION} -DartifactId=${NAME}_${SCALAVERSION} -Dversion=${VERSION} -Dpackaging=jar -DlocalRepositoryPath=${LOCALMAVENREPO} -DcreateChecksum=true
