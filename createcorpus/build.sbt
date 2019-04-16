@@ -10,14 +10,14 @@ name := "CreateCorpus"
 version := "0.0.3"
 publishMavenStyle := true
 
-// Spark 1.6.7 like Scala 2.10.5
-scalaVersion := "2.10.5"
+//scalaVersion := "2.10.5"
+scalaVersion := "2.11.12"
 
 // Realtime Output Please
 logBuffered in Test := false
 
 // The WARCParser Library
-libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.8"
+libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.14"
 libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "1.6.7"
 libraryDependencies += "edu.stanford.nlp" % "stanford-parser" % "3.9.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.2"
