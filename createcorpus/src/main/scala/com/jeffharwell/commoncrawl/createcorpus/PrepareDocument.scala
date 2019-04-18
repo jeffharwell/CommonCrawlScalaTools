@@ -110,7 +110,9 @@ class PrepareDocument(document: String) extends java.io.Serializable {
 
   var valid_opening_brackets = List[String]("-LRB-","-LSB-","-LCB-")
   var valid_quotes = List[String]("`","'","''","``")
-  def getSentenceAdditionalStartCharacters(previous_tokens: List[String], sentence_start: String = ""): Option[String] = {
+
+  @scala.annotation.tailrec
+  final def getSentenceAdditionalStartCharacters(previous_tokens: List[String], sentence_start: String = ""): Option[String] = {
     // This is a bit tricky, we want to recurse through the previous tokens list.
     // If the first token is an single or double quote we are done. If it is an opening bracket (-LRB-, -LSB-, -LCB-)
     // then we slap that onto the sentence_start variable and then recurse. If the next token is a single or double quote (' or '')
@@ -149,7 +151,8 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     }
   }
 
-  def findSentenceStartIndex(textblock: String, tokens: ListBuffer[String], previous_tokens: List[String] = List[String]()): Option[Int] = {
+  @scala.annotation.tailrec
+  final def findSentenceStartIndex(textblock: String, tokens: ListBuffer[String], previous_tokens: List[String] = List[String]()): Option[Int] = {
     var h = tokens.head
     if (upper_pattern.matcher(h).find()) {
       // alright, we have the token that starts the sentence, now what else could be in front that could
@@ -179,7 +182,8 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // to the same sentence, say the string '"['. Now, the trick is that the PTB Tokenizer drops spaces as it tokenizes, so the textblock might
   // actually be: 'end of a fragment. " [ Bob] did the thing!"', and we need to find the index of the opening double quote. I'm going to try to
   // just hack this thing together with recursion rather then do a full FSA which would solve this elegantly ... blargh
-  def getStartIndexWithAdditionalStartCharacters(textblock: String, previous_characters: String, sentence_start_token: String, search_index: Int = 0, textblock_index: Int = 0, current_match: Int = -1): Option[Int] = {
+  @scala.annotation.tailrec
+  final def getStartIndexWithAdditionalStartCharacters(textblock: String, previous_characters: String, sentence_start_token: String, search_index: Int = 0, textblock_index: Int = 0, current_match: Int = -1): Option[Int] = {
     if (debug) println("getStartIndexWithAdditionalStartCharacters: Evaluating "+textblock.head)
     if (textblock.length < sentence_start_token.length) {
       // we are done, there is no way the text block can match
@@ -279,7 +283,8 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // Mr. Ms. Jr. Rev. and other common abbreviations and consider them a distinct token,
   // so if you pass all of the tokens that end in a period to this function as invalid_endings
   // it will tell you if your current string ends with one of those endings
-  def endsWithInvalid(s: String, invalid_endings: ListBuffer[String]): Boolean = {
+  @scala.annotation.tailrec
+  final def endsWithInvalid(s: String, invalid_endings: ListBuffer[String]): Boolean = {
     if (invalid_endings.length == 0) {
       false
     } else {
