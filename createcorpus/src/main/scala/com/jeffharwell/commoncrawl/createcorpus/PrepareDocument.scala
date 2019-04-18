@@ -15,7 +15,7 @@ import java.math.BigInteger
  * Laippala, V., & Ginter, F. (2014). Syntactic n-gram collection from a large-scale corpus of internet finnish. In IOS Press (Vol. 268, p. 184).
  */
 
-class PrepareDocument(document: String) {
+class PrepareDocument(document: String) extends java.io.Serializable {
 
   /*
    * Deal with counting and classifying tokens

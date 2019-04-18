@@ -6,5 +6,5 @@ import java.sql.Timestamp
 // and map them to the schema of the Cassandra table
 case class WETPathBind(wet_path:Option[String], file_name:Option[String],
                         started_processing:Option[Timestamp], finished_processing:Option[Timestamp], successfully_processed:Option[Boolean],
-                        records_extracted:Option[Int], log_message:Option[String])
+                        records_extracted:Option[Int], log_message:Option[String]) extends java.io.Serializable
 

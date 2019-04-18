@@ -7,7 +7,7 @@ organization := "com.jeffharwell"
 
 name := "CreateCorpus"
 
-version := "0.0.3"
+version := "0.0.4"
 publishMavenStyle := true
 
 //scalaVersion := "2.10.5"
