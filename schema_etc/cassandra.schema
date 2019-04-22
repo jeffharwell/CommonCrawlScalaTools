@@ -72,3 +72,15 @@ CREATE TABLE pilotparse.wetrecord_clean (
 CREATE INDEX wetrecord_clean_categories_idx ON pilotparse.wetrecord_clean (values(categories));
 CREATE CUSTOM INDEX lucene_wetrecord_clean_idx ON pilotparse.wetrecord_clean (lucene) USING 'com.stratio.cassandra.lucene.Index' WITH OPTIONS = {'refresh_seconds': '300', 'schema': '{ fields: { content: {type: "text", analyzer: "english"} }  }'};
 CREATE INDEX wetrecord_clean_path_idx ON pilotparse.wetrecord_clean (wet_path);
+
+CREATE TABLE pilotparse.golden_politics (
+    warc_record_id text PRIMARY KEY,
+    relevance text,
+    content text,
+    content_length text,
+    content_type text,
+    warc_target_uri text,
+    warc_tldn text,
+    wet_path text
+);
+
