@@ -31,12 +31,12 @@ object SaveResultsToFile {
   /*
    * Takes a warc_record_id string and retuns the filename
    */
-  def getFilename(warc_record_id: String): String = {
+  def getFilename(warc_record_id: String, tldn: String): String = {
     // Starts like <urn:uuid:409caca2-adf6-41f6-9bef-7c7c1cde3aab>
     val id_array = warc_record_id.split(':')
 
     // Returns something like 409caca2-adf6-41f6-9bef-7c7c1cde3aab.txt
-    id_array(2).replace(">","")+".txt"
+    tldn+"-"+id_array(2).replace(">","")+".txt"
   }
 
   /*
@@ -69,10 +69,12 @@ Directory is the local directory name in which to write the results, it must alr
   /*
    * Writes the file
    */
-  def writeToFile(path: String, filename: String, lucene: String, content: String): Unit = {
+  def writeToFile(path: String, filename: String, url: String, tldn: String, relevance: String, content: String): Unit = {
     var fullpath: Path = Paths.get(path + "/" + filename)
     var writer: BufferedWriter = Files.newBufferedWriter(fullpath, Charset.forName("UTF-8"))
-    writer.write(lucene+"\n\n")
+    writer.write("URL: "+url+"\n")
+    writer.write("Top Level Domain Name: "+tldn+"\n")
+    writer.write("Relevance: "+relevance+"\n\n")
     writer.write(content)
     writer.close()
   }
@@ -109,8 +111,8 @@ Directory is the local directory name in which to write the results, it must alr
     // It is the example usage of the fetchMoreResults method.
     while (iter.hasNext) {
       row = iter.next()
-      var filename = getFilename(row.getString("warc_record_id"))
-      writeToFile(directory, filename, row.getString("lucene"), row.getString("content"))
+      var filename = getFilename(row.getString("warc_record_id"), row.getString("warc_tldn"))
+      writeToFile(directory, filename, row.getString("wet_path"), row.getString("warc_tldn"), row.getString("relevance"), row.getString("content"))
       println("Writing: "+filename+" "+row.getString("warc_record_id"))
     }
     session.close()
