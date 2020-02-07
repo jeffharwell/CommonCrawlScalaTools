@@ -84,3 +84,7 @@ CREATE TABLE pilotparse.golden_politics (
     wet_path text
 );
 
+CREATE TABLE pilotparse.feature_space (
+    feature_value int PRIMARY KEY,
+    feature_index int
+);
