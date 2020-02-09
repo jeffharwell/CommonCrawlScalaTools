@@ -1,5 +1,8 @@
 package com.jeffharwell.commoncrawl.warcparser
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
+
 /*
  * Call the implements a WARC Record Filter
  *
@@ -25,6 +28,12 @@ class MyWARCFilter() extends java.io.Serializable {
   // content before it is considered a match. Defaults to 7.
   var minimummentions = 7
 
+  var debug = false
+  var debug_message_length = 500000
+  // this contols the maximum number of chunks that the detailed test with check for
+  // the presence of keywords.
+  var max_chunks_to_check = 5000
+
   // Setter for Minimum Mentions
   def setMinMentions(i :Int): Unit = {
     minimummentions = i
@@ -36,10 +45,42 @@ class MyWARCFilter() extends java.io.Serializable {
   }
 
   /*
+   * Sets the debug flag. This will result in the code writing debug messages
+   * to the standard output. The debug messages are designed to help with 
+   * performance profiling
+   */
+  def setDebug() {
+    debug = true
+    println("Debugging is on for MyWARCFilter")
+    println(s"  Debugging output for records where length > ${debug_message_length}")
+    println(s"  Will only check a maximum of ${max_chunks_to_check} chunks when doing a detailed check.")
+  }
+
+  /*
+   * Sets the message length at which debugging messages will be written 
+   * when setDebug has been called
+   */
+  def setDebugMessageLength(l: Int): Unit = {
+    debug_message_length = l
+  }
+
+  /*
+   * The filter will only check a certain number of chunks when doing a detailed check. Once you get
+   * over 100,000 it can take several minutes to do the detailed check. The code defaults to 40,000 
+   * which can take over a minute to process on my laptop.
+   * It also indirectly controls some debugging output. The debug
+   * output from the detailed check will not print if the number of chunks is less than this 
+   * threshold.
+   */
+  def setMaxChunksToCheck(m: Int): Unit = {
+    max_chunks_to_check = m
+  }
+
+  /*
    * A sweet bit of Scala syntactic sugar
    * apply() is the function that gets called when an object is used 
-   * as a function (not quite accurate but close). This this method 
-   * gets called when:
+   * as a function (not quite accurate but close). This method is 
+   * called when:
    *
    * val myfilter = new MyWARCFilter()
    * myfilter(mywarcrecord)
@@ -57,8 +98,15 @@ class MyWARCFilter() extends java.io.Serializable {
     // of mentions
     //
     // detailCheck is the more expensive check 
-    if (containsKeywords(w.fields("Content"), minimummentions)) { detailCheck(w) }
-    else { false }
+    if (debug && w.fields("Content").length > debug_message_length) { println(s"Processing Record ${w.get("WARC-Record-ID")} of length ${w.fields("Content").length}") }
+    var start_time = System.currentTimeMillis()
+    if (containsKeywords(w.fields("Content"), minimummentions)) { 
+      var end_time = System.currentTimeMillis()
+      if (debug && w.fields("Content").length > debug_message_length) { println(s"Running containsKeywords took ${end_time - start_time} ms") }
+      detailCheck(w)
+    } else { 
+      false
+    }
   }
 
   def detailCheck[A <: WARCRecord](wrecord: A): Boolean = {
@@ -78,27 +126,78 @@ class MyWARCFilter() extends java.io.Serializable {
     // Throw out the chunks that don't match our criteria
     // Run cimatch over the remaining chunks
 
-    // Single liner .. takes a string and first splits it by lines then by periods
+    var start_time = System.currentTimeMillis()
+    /* The functional one liner, it is A LOT slower than the imperative version below with uses the list buffer
+     * 33236 ms to generate 46,000 chunks vs 39 ms for the imperative version 
+     *
     val chunks = wrecord.fields("Content").split("\\n").foldLeft(List[String]()) { (x, t) => x ++ t.split("\\. ") }
+    */
+    /*
+     * The imperative version
+     */
+    val newline_chunks: Array[String] = wrecord.fields("Content").split("\\n")
+    val chunks: ListBuffer[String] = new ListBuffer()
+    newline_chunks.foreach { x => 
+      chunks.appendAll(x.split("\\. "))
+    }
 
-    // This is a bit tricky,
-    // A recursive function that checks each chunk to see if it is 
-    // < 50 "words" but greater than 7 "words". If so check containsKeyword. If 
-    // true then we are done, it passes the filter, if false then grab the next chunk.
-    def checkChunks(chunks: List[String]): Boolean = {
+    var end_time = System.currentTimeMillis()
+
+    if (debug && chunks.length > max_chunks_to_check) { println(s"Generated ${chunks.length} chunks in ${end_time - start_time} ms") }
+    
+    // checkChunks is expensive and will run for a long time if you process tens of thousands or hundreds of thousands 
+    // of chunks, especially of those chunks are small.
+    //
+    // We only want to do a detailed check on things that might actually be sentences. Since we split by newline and then periods it 
+    // seems reasonable to say that we one only interested in chunks that have between 7 and 50 words.
+    def chunkFilter(chunk: String): Boolean = {
+      val chunksize = chunk.split(" ").filter { y => y != "" }.length // filter, otherwise each empty string counts in the length, not what we want
+      if (chunksize > 7 && chunksize < 50)  {
+        true
+      } else {
+        false
+      }
+    }
+    val valid_chunks = chunks.filter(chunkFilter(_))
+
+    // We might still get a really large number of chunks to check, we are only going to process the first X thousand
+    // We don't want to run for more than a few minutes or it might cause problems, especially if this is being used 
+    // as the filter on a network stream .. things will start timing out.
+    if (debug && chunks.length > max_chunks_to_check) { println(s"Found ${valid_chunks.length} chunks of appropriate size to check") }
+
+    // Calculate the chunk number to which we will process before quiting based on the max_chunks_to_check
+    var min = {
+      if (valid_chunks.length > max_chunks_to_check) {
+        valid_chunks.length - max_chunks_to_check 
+      } else {
+        0
+      }
+    }
+    if (debug && valid_chunks.length > max_chunks_to_check) { println(s"Only searching to depth ${min}") }
+
+    @tailrec
+    def checkChunks(chunks: ListBuffer[String], min: Int): Boolean = {
       val chunk = chunks.head
       val t = chunks.tail
+      val t_size = t.size
 
-      val chunksize = chunk.split(" ").size
-      // It only has to
-      if (chunksize > 7 && chunksize < 50 && containsKeywords(chunk, 1)) { true }
-      else if (t.size == 0) { false }
-      else { checkChunks(t) }
+      if (t_size <= min) { false }
+      else if (t_size == 0) { false }
+      else if (containsKeywords(chunk, 1)) { true }
+      else { checkChunks(t, min) }
     }
-    checkChunks(chunks)
+    start_time = System.currentTimeMillis()
+    // don't pass checkChunks an empty list, it bombs out on chunks.head
+    var has_mentions: Boolean = { if (valid_chunks.length == 0) { false }
+                                  else { checkChunks(valid_chunks, min) }
+                                }
+    end_time = System.currentTimeMillis()
+    if (debug && chunks.length > max_chunks_to_check) { println(s"checkChunks ran in ${end_time - start_time} ms") }
+    has_mentions
   }
 
   def containsKeywords(tocheck: String, mentions: Int): Boolean = {
+    @tailrec
     def checkKeyword(tocheck: String, keywordlist: List[String]): Boolean = {
       val keyword = keywordlist.head
       val t = keywordlist.tail
@@ -123,6 +222,7 @@ class MyWARCFilter() extends java.io.Serializable {
   def ciMatch(src: String, what: String): Int = {
     val length: Int = what.size
     var matches = 0
+    var lowerwhat = what.toLowerCase()
 
     if (length == 0)
         return src.size // a bit arbitrary here, you could say a String contains
@@ -131,20 +231,22 @@ class MyWARCFilter() extends java.io.Serializable {
 
     val firstLo = Character.toLowerCase(what.charAt(0))
     val firstUp = Character.toUpperCase(what.charAt(0))
-    //println(s"Initial match for ${firstLo} or ${firstUp}")
 
     for (i <- 0 to src.size - length) {
       val ch = src.charAt(i)
-      //println(s"Looking at ${ch}")
       if (ch == firstLo || ch == firstUp) {
-        //println("Got an initial match")
+        /*
+        if (lowerwhat == src.slice(i, i+length).toLowerCase()) {
+          matches += 1
+        }
+        */
+        // regionMatches runs one or two seconds faster overall on a WARC file than the src.slice version above
         if (src.regionMatches(true, i, what, 0, length)) {
           matches += 1
         }
       }
     }
 
-    //println(s"Found ${matches} matches min mentions is ${minimummentions}")
     return matches
   }
 }

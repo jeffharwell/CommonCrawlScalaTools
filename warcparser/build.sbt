@@ -2,7 +2,7 @@ organization := "com.jeffharwell"
 
 name := "WARCParser"
 
-version := "0.0.14"
+version := "0.0.24"
 publishMavenStyle := true
 
 //scalaVersion := "2.12.0"

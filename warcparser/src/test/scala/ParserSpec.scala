@@ -158,6 +158,7 @@ class ParserSpec extends FlatSpec {
    * Unit Tests
    */
 
+
   /*
    * Start and Finish Trigger Tests
    *
@@ -367,6 +368,12 @@ class ParserSpec extends FlatSpec {
    *
    */
 
+  "parser" should "allow us to enable parser rate debug messages" in {
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.setDebugRate()
+  }
+
   "parser" should "report the average time it took to parse the last 10 documents" in {
     val myFinishTrigger = new MyParserTrigger
 
@@ -458,6 +465,38 @@ class ParserSpec extends FlatSpec {
     }
 
     assert(parser.getAverageParseRate > 0)
+  }
+
+  "parser" should "output debug messages if the parse rate is set very low and debug is set" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    // https://stackoverflow.com/questions/7218400/scalatest-how-to-test-println
+    val stream = new java.io.ByteArrayOutputStream()
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.setRateLimit(.0000001) // it should take Moore's law a bit to catch up to this. Parsing a record per nanosecond.
+    parser.setDebugRate()
+
+    var records = ListBuffer[WARCRecord]()
+
+    try {
+      Console.withOut(stream) {
+        parser.foreach((wc: WARCRecord) => records += wc)
+      }
+      // if you care to see the debug messages, uncomment the below and
+      // run the test suite.
+    } catch {
+      // no worries, we were expecting an exception, we only care about the debug output
+      case e: Exception => true
+    }
+    var output = stream.toString("UTF-8")
+    // If you want to see the debug output uncomment the below
+    // and then recompile and run the test suite.
+    //println(output)
+    assert(output.length > 0) // there should be output
+    assert(output contains "The current parse cycle has taken") // this is part of the text the message should contain in the
+                                                               // case of a slow parse (a bit sloppy I know but gets the job done.)
   }
 
   "parser" should "not throw a ParserTooSlowException if the parse rate is very high" in {

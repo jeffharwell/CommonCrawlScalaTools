@@ -97,6 +97,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   var steps = 0
   var corruptiondetected = false
 
+  var debug_rate = false // if set to true the parser will print the elapsed time for each document parsed
   var rate_queue = new Queue[Long] // holds the elapsed time taken to parse the last 10 (or less) documents
   var rate_limit: Double = 0.0 // the rate limit. If our average rate drops below this limit then throw a Runtime Error
   var queue_size: Int = 10 // number of documents for which we keep the rate history
@@ -135,6 +136,18 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   }
 
   /*
+   * Tells the parser to print debugging messages regarding the rate at which documents
+   * are being parsed. The original goal for this functionality was to be able to 
+   * troubleshoot network connectivity issues and understand how network issues affect 
+   * the parser in the Spark context.
+   *
+   * The debug messages will do to standard out.
+   */
+  def setDebugRate() = {
+    debug_rate = true
+  }
+
+  /*
    * Set a rate limit in milliseconds. If the parser is running more slowly than the set rate limit then 
    * it will throw a RuntimeError
    *
@@ -152,7 +165,11 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   def checkRateLimit() = {
     // If the rate limit is set and the rate_queue is full
     if (rate_limit > 0 && rate_queue.size == queue_size ) {
-      if (getAverageParseRate() > rate_limit) {
+      var avg_parse_rate = getAverageParseRate()
+      if (debug_rate) {
+        println(s"Checking Rate Limit: Documents parsed = ${getRecordCount()} Average Parse Rate = ${avg_parse_rate}. Rate Queue Length = ${rate_queue.length} Rate Limit is ${rate_limit}.")
+      }
+      if (avg_parse_rate > rate_limit) {
         throw new ParserTooSlowException("The parser is parsing records more slowly than the rate limit ${rate_limit) ms that was set.")
       }
     }
@@ -293,7 +310,14 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     def getContent(w: WARCRecord, f: Fsa): Unit = {
       // Read the amount of content from the InputStream that is specified in the header
       // the +2 handles the blank line (\r\n) between the headers and the content
+      if (debug_rate) { println("Getting ready to read content") }
+      var start_read_time = System.currentTimeMillis()
       val c: String = reader.getStringFromBytes(f.bytestoread+2).trim()
+      var end_read_time = System.currentTimeMillis()
+      if (debug_rate) {
+        var delta = end_read_time - start_read_time
+        println(s"reader.getStringFromBytes(${f.bytestoread}+2) took ${delta} ms")
+      }
 
       // Now that we have the content set bytestoread in our context class
       // to zero, this may help prevent a logic bug from causing us to skip records
@@ -306,7 +330,15 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // Used by states that need to add a header from the input stream
     def addHeaderToWARCObject(w: WARCRecord): Unit = {
       // get a line
+      if (debug_rate) { println("Getting ready to read a line") }
+      var start_read_time = System.currentTimeMillis()
       var rawline = reader.getLine()
+      var end_read_time = System.currentTimeMillis()
+      if (debug_rate) {
+        var delta = end_read_time - start_read_time
+        println(s"reader.getLine took ${delta} ms")
+      }
+
       if (rawline.contains(": ")) {
         var split = rawline.split(": ") // this is almost certainly a bug waiting to happen
                                         // probably should use a regex instead but that would
@@ -748,6 +780,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * @return A list of individual WET records
    */
   def next(): WARCRecord = {
+    if (debug_rate) { println("next() method called") }
     // docs say behaviour when next() is called after hasNext() would
     // report false is undefined, in our case we will throw a runtime
     // as I think it likely the code has made a mistake that the programmer
@@ -759,6 +792,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // Copy nextrecord into the record we are going to return
     var recordtoreturn = currentwarcconversion
 
+    if (debug_rate) { println("current record saved, trying to get the next record") }
     // Go ahead and try to get the record we will return if next() is called again
     privateNext()
 
@@ -790,6 +824,8 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // called. This method is called on initialization of the object to queue up the first record.
    
     // recursive routine to run the FSA
+    
+    if (debug_rate) { println("privateNext() method called") }
 
     // Set our start time if necessary
     var start_time = {
@@ -803,6 +839,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // this shouldn't return until the instance variable 'currentwarcconversion' is set
     // with a complete WARC conversion record
     var state: State = fsa.run()
+    if (debug_rate) { println("Initial fsa.run() complete, moving to loop") }
     steps = steps + 1
     // This is the main run loop, keep running the fsa (repeatedly calling fsa.run() until
     // we hit one of the states specified below.
@@ -825,16 +862,34 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       //              parsing itself, although you would catch up with S5 transitions
       //              to Final via S3 after the last record.
       state = fsa.run()
+      if (debug_rate) { print(".") }
       steps = steps + 1
       if (steplimit > 0 && steps > steplimit) {
         throw new RuntimeException(s"FSA Exceded the step limit ${steplimit}. Ended in state: "+state)
       }
+
+      // If debug_rate is set, and we have a rate limit, we want to print out the elapsed time that the 
+      // parser has spent on the current document IF that time has already supassed the average rate limit
+      // that we have set
+      if (debug_rate && rate_limit > 0) {
+        var current_time = System.currentTimeMillis()
+        var elapsed_millis = current_time - start_time
+        if (elapsed_millis > rate_limit) {
+          println(s"The current parse cycle has taken ${elapsed_millis} ms > ${rate_limit} ms rate limit and has not returned a document.")
+        }
+      }
+      
     }
 
     // Calculate our rate if we have a valid start ime and a rate limit is set
     if (start_time > 0 && rate_limit > 0) {
       var finish_time = System.currentTimeMillis()
       var elapsed_millis = finish_time - start_time
+
+      if (debug_rate) {
+        println(s"Document returned in ${elapsed_millis} ms. Current rate limit is ${rate_limit} ms.")
+      }
+
       if (rate_queue.size >= queue_size) {
         // We are only keeping stats on the last 10 documents that we parsed
         rate_queue.dequeue
@@ -847,15 +902,14 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       checkRateLimit()
     }
 
-
     // These states mean we are done with the file one way
     // or another
     if (state == Sink1 || state == Sink2 || state == Final) {
       hasnext = false
-
-
       // We are done, call the finish trigger if we have one
       callFinishTrigger(Some(state))
+      if (debug_rate) { println("Finished with file, hasnext is now false, finishTrigger called with current state") }
     }
+    if (debug_rate) { println("Finished with privateNext method") }
   }
 }
