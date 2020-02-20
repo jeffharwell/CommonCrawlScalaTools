@@ -577,6 +577,35 @@ class ParserSpec extends FlatSpec {
     assert(parser.getRecordCount() == 0)
   }
 
+  "parser" should "set the memoryDebug on the reader and output debug messages regarding memory usage if the debug memory flag is set" in {
+    val myFinishTrigger = new MyParserTrigger
+
+    // https://stackoverflow.com/questions/7218400/scalatest-how-to-test-println
+    val stream = new java.io.ByteArrayOutputStream()
+
+    val parser = Parser(new BufferedInputStream(
+      new FileInputStream(new File(filter_test_1.getFile()))), 100000)
+    parser.setRateLimit(.0000001) // it should take Moore's law a bit to catch up to this. Parsing a record per nanosecond.
+    parser.setDebugMemory()
+
+    var records = ListBuffer[WARCRecord]()
+
+    try {
+      Console.withOut(stream) {
+        parser.foreach((wc: WARCRecord) => records += wc)
+      }
+    } catch {
+      // no worries, we were expecting an exception, we only care about the debug output
+      case e: Exception => true
+    }
+    var output = stream.toString("UTF-8")
+    // If you want to see the debug output uncomment the below
+    // and then recompile and run the test suite.
+    //println(output)
+    assert(output.length > 0) // there should be output
+    assert(output contains "Heap Size") // this is part of the text the message should contain in the
+                                        // case of a memory debug (sloppy I know but gets the job done.)
+  }
 
 
   /*

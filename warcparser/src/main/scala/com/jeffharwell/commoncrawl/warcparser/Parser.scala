@@ -109,6 +109,9 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   var startTrigger: Option[ParserTrigger] = None : Option[ParserTrigger]
   var finishTrigger: Option[ParserTrigger] = None : Option[ParserTrigger]
 
+  // Debug Memory Usage
+  var debugMemory = false
+
   // Initialize our reader
   val reader = new Reader(inputstream)
 
@@ -145,6 +148,11 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    */
   def setDebugRate() = {
     debug_rate = true
+  }
+
+  def setDebugMemory() = {
+    debugMemory = true
+    reader.setDebugMemory()
   }
 
   /*

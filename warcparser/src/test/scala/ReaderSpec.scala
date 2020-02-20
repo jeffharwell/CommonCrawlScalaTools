@@ -352,4 +352,34 @@ class ReaderSpec extends FlatSpec {
     assert(reader.isEndOfStream())
   }
 
+  "reader" should "output memory debug messages if the debug memory flag is set" in {
+    val reader = new Reader(new BufferedInputStream(
+      new FileInputStream(new File(sixlinesfile.getFile()))), 5)
+    reader.setDebugMemory()
+
+    // https://stackoverflow.com/questions/7218400/scalatest-how-to-test-println
+    val stream = new java.io.ByteArrayOutputStream()
+
+    try {
+      Console.withOut(stream) {
+        val from_bytes = reader.getStringFromBytes(5)
+      }
+    } catch {
+      // no worries, we only care about the debug output
+      case e: Exception => true
+    }
+
+
+    val from_line = reader.getLine()
+
+    var output = stream.toString("UTF-8")
+    // If you want to see the debug output uncomment the below
+    // and then recompile and run the test suite.
+    //println(output)
+    assert(output.length > 0) // there should be output
+    assert(output contains "Heap Size") // this is part of the text the message should contain in the
+                                        // case of a memory debug (sloppy I know but gets the job done.)
+  }
+
+
 }

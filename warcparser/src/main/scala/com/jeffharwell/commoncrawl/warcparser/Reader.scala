@@ -76,6 +76,16 @@ class Reader(inputstream: InputStream, internalbuffersize: Int) {
   // Other Constants
   val newlinebyte = "\n".getBytes("UTF-8").last
 
+  var debugMemory = false // debug our memory usage
+
+  /*
+   * Setting for turning on memory debugging, simply prints to standard out, which is 
+   * reasonably effective in Spark
+   */
+  def setDebugMemory(): Unit = {
+    debugMemory = true
+  }
+
   /*
    * Get the size of the internal read buffer
    *
@@ -134,9 +144,21 @@ class Reader(inputstream: InputStream, internalbuffersize: Int) {
    * @param n bytes to read
    */
   def getStringFromBytes(n: Int): String = {
-    val contentbuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
+    if (debugMemory) {
+      println(s"Heap Size:      ${BigDecimal(Runtime.getRuntime().totalMemory().toDouble/1024/1024).setScale(2, BigDecimal.RoundingMode.HALF_UP)}")
+      println(s"Max Heap Size:  ${BigDecimal(Runtime.getRuntime().maxMemory().toDouble/1024/1024).setScale(2, BigDecimal.RoundingMode.HALF_UP)}")
+      println(s"Heap Free Size: ${BigDecimal(Runtime.getRuntime().freeMemory().toDouble/1024/1024).setScale(2, BigDecimal.RoundingMode.HALF_UP)}")
+      println(s"Attempting to get ${n} bytes from stream")
+    }
+
+    //val contentbuffer = scala.collection.mutable.ArrayBuffer.empty[Byte]
+    // ListBuffer may be more memory efficient for large strings then ArrayBuffer
+    // because it does not rely on allocation of continuous blocks of RAM. See:
+    // http://rnowling.github.io/software/engineering/2015/07/01/gotcha-scala-collections.html
+    val contentbuffer = scala.collection.mutable.ListBuffer.empty[Byte]
     // reset bytes returned
     bytesreturned = 0
+
 
 
     if (endofstream) {
