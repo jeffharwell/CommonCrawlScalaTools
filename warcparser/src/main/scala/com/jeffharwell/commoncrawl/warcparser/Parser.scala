@@ -1,17 +1,9 @@
 package com.jeffharwell.commoncrawl.warcparser
 
-import java.io.File;
-import java.io.BufferedInputStream
 import java.io.InputStream
-import java.io.FileInputStream
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.lang.System
-import java.util.zip.GZIPInputStream
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.Queue
-import scala.collection.immutable.List
-import scala.collection.immutable.Map
+
 
 /*
  * Parser Factory Companion Object
@@ -92,13 +84,13 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
                                                                           // record we are working on right now
   var hasnext: Boolean = true
 
-  val statetrace = ListBuffer[State]()
+  val statetrace: ListBuffer[State] = ListBuffer[State]()
   var debug = false
   var steps = 0
   var corruptiondetected = false
 
   var debug_rate = false // if set to true the parser will print the elapsed time for each document parsed
-  var rate_queue = new Queue[Long] // holds the elapsed time taken to parse the last 10 (or less) documents
+  var rate_queue = new mutable.Queue[Long] // holds the elapsed time taken to parse the last 10 (or less) documents
   var rate_limit: Double = 0.0 // the rate limit. If our average rate drops below this limit then throw a Runtime Error
   var queue_size: Int = 10 // number of documents for which we keep the rate history
 
@@ -128,10 +120,10 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * does not track the average record parse time unless it is monitoring the rate.
    * I'm not sure this was the best design choice but it is what we have for now.
    */
-  def getAverageParseRate(): Double = {
-    var sum = rate_queue.sum.toDouble
+  def getAverageParseRate: Double = {
+    val sum = rate_queue.sum.toDouble
     var avg: Double = 0.0
-    if (rate_queue.size > 0) {
+    if (rate_queue.nonEmpty) {
       avg = sum / rate_queue.size
     }
 
@@ -146,11 +138,11 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    *
    * The debug messages will do to standard out.
    */
-  def setDebugRate() = {
+  def setDebugRate(): Unit = {
     debug_rate = true
   }
 
-  def setDebugMemory() = {
+  def setDebugMemory(): Unit = {
     debugMemory = true
     reader.setDebugMemory()
   }
@@ -162,7 +154,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * @param limit the average rate in milliseconds under which the parser will throw a ParserTooSlowException
    * @param q_size the number of recent documents to use with calculating the average rate, defaults to 10
    */
-  def setRateLimit(limit: Double, q_size: Int = 10) = {
+  def setRateLimit(limit: Double, q_size: Int = 10): Unit = {
     rate_limit = limit
     queue_size = q_size
   }
@@ -170,12 +162,12 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   /*
    * Checks the rate limit and throws the error
    */
-  def checkRateLimit() = {
+  def checkRateLimit(): Unit = {
     // If the rate limit is set and the rate_queue is full
     if (rate_limit > 0 && rate_queue.size == queue_size ) {
-      var avg_parse_rate = getAverageParseRate()
+      val avg_parse_rate = getAverageParseRate
       if (debug_rate) {
-        println(s"Checking Rate Limit: Documents parsed = ${getRecordCount()} Average Parse Rate = ${avg_parse_rate}. Rate Queue Length = ${rate_queue.length} Rate Limit is ${rate_limit}.")
+        println(s"Checking Rate Limit: Documents parsed = ${getRecordCount()} Average Parse Rate = $avg_parse_rate. Rate Queue Length = ${rate_queue.length} Rate Limit is $rate_limit.")
       }
       if (avg_parse_rate > rate_limit) {
         throw new ParserTooSlowException("The parser is parsing records more slowly than the rate limit ${rate_limit) ms that was set.")
@@ -195,7 +187,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    * @param pt An object that inherits from ParseTrigger.
    *
    */
-  def addStartTrigger[A <: ParserTrigger](pt: A) = {
+  def addStartTrigger[A <: ParserTrigger](pt: A): Unit = {
     startTrigger = Some(pt)
 
     // This is a bit tricky. The constructor for the Parser immediately instantiates
@@ -214,7 +206,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
    *
    */
 
-  def addFinishTrigger[A <: ParserTrigger](pt: A) = {
+  def addFinishTrigger[A <: ParserTrigger](pt: A): Unit = {
     finishTrigger = Some(pt)
 
     if (!hasnext) {
@@ -228,7 +220,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   /*
    * Private method that calls the start trigger if it is defined
    */
-  private def callStartTrigger() = {
+  private def callStartTrigger(): Unit = {
     val extractedfilename: Option[String] = currentwarcinfo.get("WARC-Filename")
     val logmessage: Option[String] = currentwarcinfo.get("WARC-Filename") match {
       case Some(f) => None: Option[String]
@@ -244,9 +236,9 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   }
 
   /*
-   * Private method the calles the finish trigger if it is defined
+   * Private method the calls the finish trigger if it is defined
    */
-  private def callFinishTrigger(state: Option[State]) = {
+  private def callFinishTrigger(state: Option[State]): Unit = {
     // handle the case of the finishTrigger essentially being called immediately when it is added
     // this means that by the time the trigger was added the parse is already done. This could mean
     // that the file was really corrupt and the parser swept through the entire file looking for even
@@ -852,7 +844,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // This is the main run loop, keep running the fsa (repeatedly calling fsa.run() until
     // we hit one of the states specified below.
     while (state != Sink1 && state != Sink2 && state != Final && state != S5) {
-      // I keep having to look this up, so there is the logic.
+      // I keep having to look this up, so here is the logic.
       // When you call fsa.run() it calls the .event method on the EXISTING state.
       // That event method will run the states logic and return the new internal state.
       // So .. the state that is returned, which goes into the 'state' variable below,

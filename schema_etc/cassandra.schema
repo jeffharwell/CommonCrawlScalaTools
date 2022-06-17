@@ -1,5 +1,17 @@
 CREATE KEYSPACE pilotparse WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}  AND durable_writes = true;
 
+CREATE TABLE pilotparse.random_wetpaths (
+    wet_path text PRIMARY KEY
+);
+
+CREATE TABLE pilotparse.classified_warc_document (
+    warc_record_id text,
+    category text,
+    core_keywords bigint,
+    secondary_keywords bigint,
+    PRIMARY KEY (warc_record_id, category)
+) WITH compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'};
+
 CREATE TABLE pilotparse.wetpaths (
     wet_path text PRIMARY KEY,
     file_name text,

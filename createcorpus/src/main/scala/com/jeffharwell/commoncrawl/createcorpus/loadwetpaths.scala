@@ -38,38 +38,47 @@ object loadwetpaths {
 
     val sc = new SparkContext(conf)
 
+    /*
+    Here is the bind class from WETPathBind.
+    wet_path:Option[String], file_name:Option[String], finished:Option[Boolean], started:Option[Boolean],
+                        started_processing:Option[Timestamp], finished_processing:Option[Timestamp], successfully_processed:Option[Boolean],
+                        records_extracted:Option[Int], log_message:Option[String]
+     */
+
     def processWETPathsLine(line: String): WETPathBind = {
         val filename = line.split("/")(5)
-        new WETPathBind(Some(line), Some(filename), None, None, Some(false), Some(0), None)
+        new WETPathBind(Some(line), Some(filename), Some(false), Some(false), None, None, Some(false), Some(0), None)
     }
 
     println("Truncating pilotparse.wetpaths")
-	CassandraConnector(sc.getConf).withSessionDo { session =>
-	  session.execute("truncate table pilotparse.wetpaths")
-	}
+    CassandraConnector(sc.getConf).withSessionDo { session =>
+      session.execute("truncate table pilotparse.wetpaths")
+    }
 
-	// Queue up the file, we are streaming from a GZipped file on the web
-	val url = new URL("https://commoncrawl.s3.amazonaws.com/crawl-data/CC-MAIN-2016-50/wet.paths.gz")
-	val gzipInputStream = new GZIPInputStream(url.openStream())
-	val lines = scala.io.Source.fromInputStream(gzipInputStream).getLines()
+    // Queue up the file, we are streaming from a GZipped file on the web
+    // val url = new URL("https://commoncrawl.s3.amazonaws.com/crawl-data/CC-MAIN-2016-50/wet.paths.gz")
+    val url = new URL("https://data.commoncrawl.org/crawl-data/CC-MAIN-2016-50/wet.paths.gz")
+    val gzipInputStream = new GZIPInputStream(url.openStream())
+    val lines = scala.io.Source.fromInputStream(gzipInputStream).getLines()
 
-	// Process the lines, bind them to the WARCPathBind class which defines the Cassandra table schema, then write them.
-	val wetpaths = lines.map {x => processWETPathsLine(x)}
-	val wetpathsRDD = sc.parallelize(wetpaths.toList)
-    val ignoreNullsWriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true)
-	wetpathsRDD.saveToCassandra("pilotparse", "wetpaths", writeConf = ignoreNullsWriteConf)
+    // Process the lines, bind them to the WARCPathBind class which defines the Cassandra table schema, then write them.
+    val wetpaths = lines.map {x => processWETPathsLine(x)}
+    val wetpathsRDD = sc.parallelize(wetpaths.toList)
+    //val ignoreNullsWriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true)
+    //wetpathsRDD.saveToCassandra("pilotparse", "wetpaths", writeConf = ignoreNullsWriteConf)
+    wetpathsRDD.saveToCassandra("pilotparse", "wetpaths")
 
     // Figure out how many records we wrote to Cassandra and report it
     val cResultSet: com.datastax.driver.core.ResultSet = CassandraConnector(sc.getConf).withSessionDo { session =>
-	  session.execute("select count(*) from pilotparse.wetpaths")
-	}
-	val countRow: com.datastax.driver.core.Row = cResultSet.one
-	// Ok, this is super esoteric. So a cassandra type of int is really bigint which then 
-    // looks in the return type as Columns[count(bigint)] but the corresponding Java type 
-    // is a Long as per https://docs.datastax.com/en/developer/java-driver/3.1/manual/
-    // 
-	// So if you go count.getInt("count") or count.getVarint("count") the driver throws a 
-	// conversion codec error. The proper getter method is getLong("count") ... irritating.
+      session.execute("select count(*) from pilotparse.wetpaths")
+    }
+    val countRow: com.datastax.driver.core.Row = cResultSet.one
+    // Ok, this is super esoteric. So a cassandra type of int is really bigint which then
+      // looks in the return type as Columns[count(bigint)] but the corresponding Java type
+      // is a Long as per https://docs.datastax.com/en/developer/java-driver/3.1/manual/
+      //
+    // So if you go count.getInt("count") or count.getVarint("count") the driver throws a
+    // conversion codec error. The proper getter method is getLong("count") ... irritating.
     // Wish I could get that 45 minutes back.
     print(s"Wrote ${countRow.getLong("count").toString} records to pilotparse.wetpaths")
 
