@@ -20,9 +20,8 @@ import scala.collection.mutable.ListBuffer
  * keywords be found minimummentions number of times. If both of those criteria are met then
  * the document is assigned to this keyword.
  *
- * @param minimummentions The minimum number of times a core keyword or combination of secondary
- *                        keywords must appear before the content matches the category. This
- *                        will default to 7.
+ * minmentions for the core keywords defaults to the number of core keywords specified for the topic. Likewise
+ * the minimum number of secondary keywords defaults to the number of secondary keywords specified for the topic.
  */
 class FourForumsWARCTopicFilter() extends WARCCategorizer {
 
@@ -259,6 +258,9 @@ class FourForumsWARCTopicFilter() extends WARCCategorizer {
   def ciMatch(src: String, what: LookupStruc): Map[String, (Int, Int)] = {
     val length: Int = what.size
 
+    // Build the structure that will hold our match counts. It is a mutable map with the topic specified by the string
+    // and the number of core and secondary keywords matches are held in the (Int, Int) tuple, which is initialized
+    // as (0, 0). We will copy it to a immutable map before we return it.
     val categories = what.foldLeft(MMap[String, (Int, Int)]())((m, struc) => {
       struc._2.foreach(x => {
         if (!m.contains(x._2)) {
@@ -269,8 +271,10 @@ class FourForumsWARCTopicFilter() extends WARCCategorizer {
     })
     //println(categories)
 
-    // Go through every character of our source document looking for a match to a keyword
-    // indicating a category
+    // Go through every character of our source document and count the number of matches to the core and secondary
+    // keywords specified for each topic. Note that the algorithm is not tokenizing, it just steps through character
+    // by character looking for substrings that match. So if a core or secondary keywords shows up in the middle of
+    // another word it will still consider it match.
     for (i <- 0 to src.size - length) {
       val ch = src.charAt(i)
       if (what.contains(ch)) {
