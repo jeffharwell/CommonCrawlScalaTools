@@ -4,7 +4,7 @@ import com.datastax.driver.core.ConsistencyLevel
 import com.datastax.spark.connector.cql.CassandraConnectorConf
 import com.datastax.spark.connector.toRDDFunctions
 import com.datastax.spark.connector.writer.WriteConf
-import com.jeffharwell.commoncrawl.warcparser.FourForumsWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.FourForumsWARCTopicFilter
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ListBuffer
@@ -61,7 +61,7 @@ object parseWETFilesFromCommoncrawl {
     // So the ProcessWETPaths object is going to be serialized and sent out to each worker so that it can
     // process each url in its partition. So ProcessWETPaths must be serializable and can't depend directly on
     // the spark context.
-    val ffc: FourForumsWARCCategorizer = new FourForumsWARCCategorizer(5, 5)
+    val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter(5, 5)
     val cassandraconf = CassandraConnectorConf(sc.getConf)
     val dcc = new ProcessWETPaths(cc_url, sc.getConf)
     val parsed_records = urls.map(x => dcc.parseWETArchiveURL(x, cassandraconf, ffc))

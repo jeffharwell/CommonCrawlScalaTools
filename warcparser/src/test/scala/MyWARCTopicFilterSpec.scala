@@ -2,31 +2,31 @@ import org.scalatest._
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.WARCInfo
-import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
-class MyWARCCategorizerSpec extends FlatSpec {
+class MyWARCTopicFilterSpec extends FlatSpec {
 
  /*
  * Unit Tests
  */
 
-  "MyWARCCategorizer" should "categorizer a paragraph that only mentions the keyword once with minmentions = 1" in
+  "MyWARCTopicFilter" should "assign a topic to a paragraph that only mentions the keyword once with minmentions = 1" in
   {
-    val c = new MyWARCCategorizer(1)
+    val c = new MyWARCTopicFilter(1)
     assert(c.getCategories(testcontent1).size > 0)
 
   }
 
-  "MyWARCCategorizer" should "categorizer testcontent1 as asthma when minmentions = 1" in
+  "MyWARCTopicFilter" should "assign the topic asthma to testcontent1 minmentions = 1" in
   {
-    val c = new MyWARCCategorizer(1)
+    val c = new MyWARCTopicFilter(1)
     assert(c.getCategories(testcontent1) == Set("asthma"))
   }
 
 
-  "MyWARCCategorizer" should "not categorizer a paragraph that only mentions the keyword once with minmentions = 2" in
+  "MyWARCTopicFilter" should "not assign a topic to a paragraph that only mentions the keyword once with minmentions = 2" in
   {
-    val c = new MyWARCCategorizer(2)
+    val c = new MyWARCTopicFilter(2)
     assert(!c.hasCategories(testcontent1))
   }
 

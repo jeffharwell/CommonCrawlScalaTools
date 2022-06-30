@@ -4,7 +4,7 @@ package com.jeffharwell.commoncrawl.warcparser.examples
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
 import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
-import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
 import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion

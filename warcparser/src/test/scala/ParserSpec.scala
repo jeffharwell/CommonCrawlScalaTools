@@ -4,7 +4,7 @@ import com.jeffharwell.commoncrawl.warcparser.WARCRecord
 import com.jeffharwell.commoncrawl.warcparser.WARCInfo
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
-import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
 import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
 import com.jeffharwell.commoncrawl.warcparser.ParserTooSlowException
@@ -400,7 +400,7 @@ class ParserSpec extends FlatSpec {
     // We have 25 documents in the file filter_test_1, so if our default queue_size is 10
     // we should end up with 10 times in the rate queue
     assert(parser.getQueueSize() == 0)
-    assert(parser.getAverageParseRate() == 0)
+    assert(parser.getAverageParseRate == 0)
   }
 
 
@@ -616,7 +616,7 @@ class ParserSpec extends FlatSpec {
    */
 
   "parser" should "accept a categorizer to use when parsing records" in {
-    val c: MyWARCCategorizer = new MyWARCCategorizer(4)
+    val c: MyWARCTopicFilter = new MyWARCTopicFilter(4)
     val parser = Parser(new BufferedInputStream(
       new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
     var records = ListBuffer[WARCRecord]()
@@ -629,7 +629,7 @@ class ParserSpec extends FlatSpec {
   }
 
   "parser" should "apply the categorizer to multiple records" in {
-    val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+    val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
     //val parser = Parser(new BufferedInputStream(
     //  new FileInputStream(new File(frag1_asthma.getFile()))), c, 1000)
     val parser = Parser(new BufferedInputStream(

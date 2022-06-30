@@ -3,7 +3,7 @@ package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 import com.datastax.spark.connector.types.CassandraOption
 import com.datastax.spark.connector.writer._
 import com.datastax.driver.core.ConsistencyLevel
-import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCCategorizer, Parser, ParserTooSlowException, WARCCategorizer, WARCRecord}
+import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Parser, ParserTooSlowException, WARCCategorizer, WARCRecord}
 import org.apache.spark.SparkConf
 
 import java.io.BufferedInputStream

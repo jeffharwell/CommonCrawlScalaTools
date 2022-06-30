@@ -5,7 +5,7 @@ import com.datastax.spark.connector.cql.CassandraConnectorConf
 import com.datastax.spark.connector.types.CassandraOption
 import com.datastax.spark.connector.{toRDDFunctions, toSparkContextFunctions}
 import com.datastax.spark.connector.writer.WriteConf
-import com.jeffharwell.commoncrawl.warcparser.{WARCRecord, FourForumsWARCCategorizer, IdentityCategorizer}
+import com.jeffharwell.commoncrawl.warcparser.{WARCRecord, FourForumsWARCTopicFilter, IdentityTopicFilter}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -57,7 +57,7 @@ object generateClassifierStatisticsFromRandomWETPaths {
     //      that have any matches.
     //      RDD of URL -> RDD of ParsedDocuments
 
-    val identity_classifier = new IdentityCategorizer() // categorize every document as a document
+    val identity_classifier = new IdentityTopicFilter() // categorize every document as a document
     val cassandraconf = CassandraConnectorConf(sc.getConf)
     val dcc = new ProcessWETPaths(cc_url, sc.getConf)
     val parsed_records_rdd_of_lists = wet_paths.map(x => dcc.parseWETArchiveURL(x.getString("wet_path"), cassandraconf, identity_classifier))
@@ -79,7 +79,7 @@ object generateClassifierStatisticsFromRandomWETPaths {
     // Create our classifier, if the document contains a core keyword, we classify it. It doesn't matter too much
     // though, because we we are interested in is the count of all string matches for each category. This will be
     // output regardless of whether or not a document is classified.
-    val ffc: FourForumsWARCCategorizer = new FourForumsWARCCategorizer(1, 0)
+    val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter(1, 0)
 
     def categorizeAndBind(warc_record_id: String, document_content: String): List[ClassifiedWARCDocument] = {
       // Even if no documents get categorized the categorizer will spit out a data structure that contains the

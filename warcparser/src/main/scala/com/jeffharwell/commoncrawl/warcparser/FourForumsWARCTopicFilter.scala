@@ -4,13 +4,17 @@ import scala.collection.mutable.{Map => MMap}
 import scala.collection.mutable.ListBuffer
 
 /*
- * Jeff's Internet Argument Corpus 2.0 FourForum WARC Categorizer
+ * Jeff's Internet Argument Corpus 2.0 FourForum WARC Topic Filter
  *
  * At present this class applies some basic rules to the content of the WARC Record
- * and then allows you to either check for the existence of the categories or to return
- * a list of categories.
+ * to define a document category, it then allows you to either check for the existence
+ * of the categories or to return a list of categories.
  *
- * This is not a general class. This is an implementation of my own categorizer requirements
+ * This is not a general class. This is an implementation of my own topic filter requirements.
+ * In particular it is designed to group documents from the Common Crawl dataset into corpora
+ * the correspond to the major topic categories in the Internet Argument Corpus 2.0 Four Forum
+ * dataset.
+ *
  * The categorization algorithm first requires that the core_keyword be found in the document
  * minimummentions number of times. It then requires that any combination of the secondary
  * keywords be found minimummentions number of times. If both of those criteria are met then
@@ -20,43 +24,43 @@ import scala.collection.mutable.ListBuffer
  *                        keywords must appear before the content matches the category. This
  *                        will default to 7.
  */
-class FourForumsWARCCategorizer(core_min_mentions: Int, secondary_min_mentions: Int) extends WARCCategorizer {
+class FourForumsWARCTopicFilter() extends WARCCategorizer {
 
   type KeywordStruc = Map[String, List[String]]
   type LookupStruc = Map[Char, List[(String, String, String)]]
 
-  /*
- * This function takes our keywords and creates a lookup structure that is then used
- * to categorize the keywords and hence categorize the document.
- *
- * Typedef:
- * f: (KeywordStruc, KeywordStruc) => LookupStruc
- *
- * The structure is a Map where the key is the first letter of the keyword, one uppercase key
- * and one lowercase key. The value is a list of tuples; the first member being the keyword
- * we want to match, the second member is the category for the keyword, the third member is the
- * type of keyword, either "core" or "secondary".
- *
- * Input Structure:
- * Map[String, List[String]](
- * "guncontrol" -> List("strict", "control"),
- * "abortion" -> List("pro-life", "pro-choice"),...)
- *
- * Output Structure:
- * HashMap(
- * 's' -> List(("strict", "guncontrol", "secondary")),
- * 'n' -> List(("natural", "evolution", "secondary")),
- * 'N' -> List(("natural", "evolution", "secondary")),
- * 'P' -> List(
- *   ("pro-choice", "abortion", "secondary"),
- *   ("pro-life", "abortion", "secondary")
- * ),
- * ...)
- *
- * @param core_keywords Map[String, List[String]] categories and core keywords
- * @param secondary_keywords Map[String, List[String]] categories and secondary keywords
- * @return lookup structure Map[Char, List[(String, String, String)]]
- */
+ /*
+  * This function takes our keywords and creates a lookup structure that is then used
+  *  to categorize the keywords and hence categorize the document.
+  *
+  * Typedef:
+  * f: (KeywordStruc, KeywordStruc) => LookupStruc
+  *
+  * The structure is a Map where the key is the first letter of the keyword, one uppercase key
+  * and one lowercase key. The value is a list of tuples; the first member being the keyword
+  * we want to match, the second member is the category for the keyword, the third member is the
+  * type of keyword, either "core" or "secondary".
+  *
+  *   Input Structure:
+  * Map[String, List[String]](
+  * "guncontrol" -> List("strict", "control"),
+  * "abortion" -> List("pro-life", "pro-choice"),...)
+   *
+  * Output Structure:
+  * HashMap(
+  * 's' -> List(("strict", "guncontrol", "secondary")),
+  * 'n' -> List(("natural", "evolution", "secondary")),
+  * 'N' -> List(("natural", "evolution", "secondary")),
+  * 'P' -> List(
+  *   ("pro-choice", "abortion", "secondary"),
+  *   ("pro-life", "abortion", "secondary")
+  * ),
+  * ...)
+  *
+  * @param core_keywords Map[String, List[String]] categories and core keywords
+  * @param secondary_keywords Map[String, List[String]] categories and secondary keywords
+  * @return lookup structure Map[Char, List[(String, String, String)]]
+  */
   def create_lookup_structure(core_keywords: KeywordStruc, secondary_keywords: KeywordStruc): LookupStruc = {
     // A small generator function, it exists to inject the correct category for an element transformer
     def get_element_transformer(category: String): ((String, List[String])) => List[List[(Char, String, String, String)]] = {
@@ -111,6 +115,35 @@ class FourForumsWARCCategorizer(core_min_mentions: Int, secondary_min_mentions: 
     }).toMap
   }
 
+ /*
+ * Creates a structure for quickly looking up the number of times a core or secondary word
+ * needs to appear per category.
+ *
+ * This is the default structure, which requires one appearance for each word specified. I.e. if two
+ * core keywords are specified, a document would be required to have at least two of either keyword
+ * mentioned before it would pass the filter and be labeled as a member of the corpus for that topic.
+ *
+ * The criteria structure looks something like.
+ *
+ * Map[String, Map[String, Int]] = Map("guncontrol" -> Map("core" -> 1, "secondary" -> 2),
+ *                                     "abortion" -> Map("core" -> 1, "secondary" -> 2),
+ *                                     "evolution" -> Map("core" -> 1, "secondary" -> 4),
+ *                                     "existenceofgod" -> Map("core" -> 1, "secondary" -> 3)
+ *                                    )
+ *
+ * @param core_keywords Map[String, List[String]] categories and core keywords
+ * @param secondary_keywords Map[String, List[String]] categories and secondary keywords
+ * @return criteria structure Map[Char, List[(String, String, String)]]
+ */
+  def create_criteria_structures(core_keywords: KeywordStruc, secondary_keywords: KeywordStruc): Map[String, Map[String, Int]] = {
+    val structure_1: Map[String, Map[String, Int]] = core_keywords.map(x =>
+      (x._1, Map("core" -> x._2.size))
+    )
+    structure_1.map(x =>
+      (x._1, x._2 ++ Map("secondary" -> secondary_keywords(x._1).size))
+    )
+  }
+
   val core_keywords = Map[String, List[String]](
     "guncontrol" -> List("gun"),
     "abortion" -> List("abortion"),
@@ -126,7 +159,32 @@ class FourForumsWARCCategorizer(core_min_mentions: Int, secondary_min_mentions: 
   )
 
   val lookup_structure: LookupStruc = create_lookup_structure(core_keywords, secondary_keywords)
+  var criteria_structure: Map[String, Map[String, Int]] = create_criteria_structures(core_keywords, secondary_keywords)
 
+  /*
+   * Sets the number of minimum mentions for a specific topic.
+   *
+   * @param topic The string with the topic
+   * @param mention A map with the minimum number of core and secondary words
+   */
+  def setMentions(topic: String, mention: Map[String, Int]): Unit = {
+    // You can only set the minimum mentions for a valid topic
+    if (!core_keywords.contains(topic) & !core_keywords.contains(topic)) {
+      throw new IllegalArgumentException
+    }
+    // You must specify the minimum mentions for the "core" and "secondary" words
+    if (!mention.contains("core") | !mention.contains("secondary")) {
+      throw new IllegalArgumentException
+    }
+    criteria_structure = criteria_structure.foldLeft(MMap[String, Map[String, Int]]())((m, element) => {
+      if (topic == element._1) {
+        m(element._1) = mention
+      } else {
+        m(element._1) = element._2
+      }
+      m
+    }).toMap
+  }
   /*
    * Returns a boolean if the string s matches any categories.
    *
@@ -175,7 +233,10 @@ class FourForumsWARCCategorizer(core_min_mentions: Int, secondary_min_mentions: 
     //println(all_matches)
 
     val just_categories = all_matches.foldLeft(ListBuffer[String]())((l, struc) => {
-      if (struc._2._1 >= core_min_mentions && struc._2._2 >= secondary_min_mentions) {
+      // l is our accumulator, the list buffer
+      // struc is the tuple from the category map returned by ciMatch
+      //   so struc._1 is the topic, and struc._2 is the number of core and secondary matches respectively
+      if (struc._2._1 >= criteria_structure(struc._1)("core") && struc._2._2 >= criteria_structure(struc._1)("secondary")) {
         l.append(struc._1)
       }
       l
@@ -192,7 +253,8 @@ class FourForumsWARCCategorizer(core_min_mentions: Int, secondary_min_mentions: 
    *
    * @param src the string to search for a match
    * @param what the lookup data structure
-   * @returns int the number of matches
+   * @returns a map of categories and tuples with the first tuple element being the number of core matches
+   *          and the second being the number of secondary matches.
    */
   def ciMatch(src: String, what: LookupStruc): Map[String, (Int, Int)] = {
     val length: Int = what.size

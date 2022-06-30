@@ -4,7 +4,7 @@ package com.jeffharwell.commoncrawl.warcparser.examples
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
 import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
-import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
 /* Other Classes */
 import scala.collection.mutable.ListBuffer
@@ -92,7 +92,7 @@ object CountLocalFiltered {
       myfilter.setMinMentions(1)
 
       // Create the categorizer
-      val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+      val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
 
       // Create the parser
       val parser = Parser(new BufferedInputStream(new FileInputStream(f)), c)
@@ -256,7 +256,7 @@ object CountLocalFiltered {
         var url = new URL(urlbase+filepath)
 
         // Create the categorizer
-        val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+        val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
 
         // Create the Filter
         val myfilter = new MyWARCFilter()
@@ -304,7 +304,7 @@ object CountLocalFiltered {
         val frag1_asthma = this.getClass().getClassLoader().getResource("filter_test_1.wet.gz")
 
         // Create the categorizer
-        val c: MyWARCCategorizer = new MyWARCCategorizer(1)
+        val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
 
         // Create the Filter
         val myfilter = new MyWARCFilter()

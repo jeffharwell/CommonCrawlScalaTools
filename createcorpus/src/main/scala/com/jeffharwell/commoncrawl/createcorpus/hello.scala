@@ -7,7 +7,7 @@ import org.apache.spark.SparkConf
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
 import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
-import com.jeffharwell.commoncrawl.warcparser.MyWARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
 object hello {
   def main(args: Array[String]) {
@@ -19,6 +19,6 @@ object hello {
     println("Running on Spark version: "+sc.version)
     print("\n\n>>>>>> END OF PROGRAM <<<<<<\n\n");
 
-    val c: MyWARCCategorizer = new MyWARCCategorizer(2)
+    val c: MyWARCTopicFilter = new MyWARCTopicFilter(2)
   }
 }

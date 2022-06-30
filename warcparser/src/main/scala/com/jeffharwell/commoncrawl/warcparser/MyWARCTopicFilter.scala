@@ -16,7 +16,7 @@ import scala.collection.mutable.ListBuffer
  * @param minimummentions The minimum number of times a keyword must appear before the 
  *                        content matches the category. This will default to 7.
  */
-class MyWARCCategorizer(minimummentions: Int) extends WARCCategorizer {
+class MyWARCTopicFilter(minimummentions: Int) extends WARCCategorizer {
 
   // Auxilary constructor that sets the minimum number of mentions to 7
   // if no minimum is specified.
