@@ -1,5 +1,9 @@
 #!/bin/bash
 
+sbt publishLocal
+stty echo
+exit
+
 echo "Don't use this. Instead use 'sbt publishLocal'"
 echo "Sbt will publish the jar to the ~/.ivy2 directory where it can be called by other projects."
 echo "The code in this bash script will publish a jar file to the local Maven repo ~/.m2."

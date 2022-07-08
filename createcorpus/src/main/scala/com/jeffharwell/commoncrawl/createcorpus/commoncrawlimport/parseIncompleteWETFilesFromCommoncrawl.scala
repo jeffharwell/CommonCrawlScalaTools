@@ -1,58 +1,36 @@
 package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 
-import com.datastax.driver.core.ConsistencyLevel
 import com.datastax.spark.connector.cql.CassandraConnectorConf
 import com.datastax.spark.connector.toRDDFunctions
-import com.datastax.spark.connector.writer.WriteConf
 import com.jeffharwell.commoncrawl.warcparser.FourForumsWARCTopicFilter
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ListBuffer
 
-object parseWETFilesFromCommoncrawl {
+/*
+This object grabs all the WET file URL that are marked as started but not marked as completed (i.e. the parse
+started but failed during error at some point in the process) and retries them.
+ */
+object parseIncompleteWETFilesFromCommoncrawl {
   def main(args: Array[String]) {
-
-    // Check our arguments
-    if (args.length == 0) {
-      print("\n\n>>>>>>>>> ERROR: Must pass the number of wet paths to select randomly as an argument to spark-submit\n\n")
-      print(">>>>>>>> EXITING <<<<<<<<<\n\n")
-      throw new RuntimeException("no arguments pass to parseWETFilesFromCommonCrawl")
-    }
-    val s_number_of_wet_paths: String = args(0)
-
-    val number_of_wet_paths = {
-      try {
-        s_number_of_wet_paths.toInt
-      } catch {
-        case e: NumberFormatException => {
-          print("\n\n>>>>>>>>> ERROR: Must pass the number of wet paths to select randomly as an argument to spark-submit\n\n")
-          print(s"$s_number_of_wet_paths is not a valid number")
-          print(">>>>>>>> EXITING <<<<<<<<<\n\n")
-          throw new RuntimeException("invalid arguments passed to parseWETFilesFromCommonCrawl")
-        }
-      }
-    }
 
     // First set up the Spark context and point it to the Cassandra cluster.
     // The DNS name cassandra.default.svc.cluster.local resolves to the correct Cassandra
     // cluster within Kubernetes
     val conf = new SparkConf()
-      .setAppName("importcommoncrawl")
+      .setAppName("processincompletewetfiles")
       .set("spark.cassandra.connection.host", "cassandra.default.svc.cluster.local")
     val sc = new SparkContext(conf)
-    //val ignoreNullsWriteConf: WriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true,
-    //  consistencyLevel = ConsistencyLevel.ONE)
 
     print("\n\n>>>>>> START OF PROGRAM <<<<<<\n\n");
-    println(s"Parsing $s_number_of_wet_paths Random WET Files from Common Crawl");
     println("Running on Spark version: " + sc.version)
 
     val cc_url: String = "https://data.commoncrawl.org"
 
     // Get a few random wetpaths that we have not processed yet
     val getwetpaths = new GetWETPaths(sc)
-    val r = getwetpaths.getRandomWETPaths(number_of_wet_paths)
-    println(s"Retrieved ${r.length.toString} paths")
+    val r = getwetpaths.getIncompleteWETPaths
+    println(s"Retrieved ${r.length.toString} paths that were not completely parsed on previous runs.")
 
     // Set Up our URLs - we want to create an RDD that has the URLs we
     // want to process in partitions so that we can send them out to the

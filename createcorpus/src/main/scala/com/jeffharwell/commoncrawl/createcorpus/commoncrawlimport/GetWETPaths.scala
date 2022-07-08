@@ -12,6 +12,24 @@ class GetWETPaths(spark_context: SparkContext) {
   // Should be something like "https://commoncrawl.s3.amazonaws.com/"
   var sc: SparkContext = spark_context
 
+  def getIncompleteWETPaths: List[(String, Boolean, Boolean)] = {
+    /*
+     * Creates a vector of WET archive URLs that have been started but not finished
+     */
+
+    // Get the WET paths from Cassandra ... lazily
+    val wetPaths = sc.cassandraTable("pilotparse", "wetpaths")
+
+    // All the wet paths that are started but not finished
+    val allpaths = wetPaths.map{x => (x.get[String]("wet_path"), x.get[Boolean]("finished"), x.get[Boolean]("started"))}
+    val incomplete = allpaths.filter{x => !x._2 && x._3}
+    val incomplete_list = incomplete.collect()
+    val number_of_incomplete = incomplete_list.length
+    println(s"Retrieved $number_of_incomplete WET URLs that are not completely parsed.")
+
+    incomplete_list.toList
+  }
+
   def getRandomWETPaths(numberOfPaths: Integer): List[(String, Boolean)] = {
     /*
      * Creates a vector of ${numberOfPaths} random WET archive URLs for us to parse later

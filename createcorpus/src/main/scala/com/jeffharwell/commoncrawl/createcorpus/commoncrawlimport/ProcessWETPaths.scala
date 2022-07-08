@@ -21,8 +21,8 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
       commoncrawl_url
     }
   }
-  val ignoreNullsWriteConf: WriteConf = WriteConf.fromSparkConf(spark_conf).copy(ignoreNulls = true,
-    consistencyLevel = ConsistencyLevel.ONE)
+  //val ignoreNullsWriteConf: WriteConf = WriteConf.fromSparkConf(spark_conf).copy(ignoreNulls = true,
+  //  consistencyLevel = ConsistencyLevel.ONE)
 
   // Our Function to Write a WARC record to the correct table in Cassandra
   def writeToCassandra(wc: WARCRecord, category: Set[String], wet_url: String): WARCCassandraBindWithCategories = {
