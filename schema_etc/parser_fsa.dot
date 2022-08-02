@@ -1,0 +1,32 @@
+digraph finite_state_machine {
+	fontname="Helvetica,Arial,sans-serif"
+	node [fontname="Helvetica,Arial,sans-serif"]
+	edge [fontname="Helvetica,Arial,sans-serif"]
+	rankdir=LR;
+	node [shape = doublecircle]; Sink1 Sink2 Final;
+    node [style = "filled" shape = circle]; S5;
+	node [style = "" shape = circle color = black];
+	// State 1
+	S1 -> Sink1 [label = "EX1"]; // corrupt archive, not a warc info record
+	S1 -> S1 [label = "E1"]; // headers not complete, keep reading
+	S1 -> S2 [label = "E2"]; // headers complete, get content
+	// State 2
+	S2 -> S3 [label = "E4"]; // we have the content, start looking for conversion
+	S2 -> Sink1 [label = "EX3"]; // corrupt archive, content ended prematurely
+	// State 3
+	S3 -> Sink1 [label = "EX5"]; // corrupt archive
+	S3 -> S3 [label = "E5"]; // headers not complete, keep reading
+	S3 -> S4 [label = "E6"]; // headers complete, move to get content
+	S3 -> S6 [label = "E7"]; // headers corrupt, scan to find next record
+	S3 -> Final [label = "E10"]; // done with the WET Archive File
+	// State 4
+	S4 -> S5 [label = "E8"]; // this is our stop state, record is complete
+	S4 -> Sink1 [label = "EX8"]; // error, we failed to get a complete record
+    // State 5
+    S5 -> S3 [label = "E9"]; // only one transition allowed, get the new WARCConversion record
+    // State 6
+    S6 -> S3 [label = "E9"]; // found one .. maybe, back to S3 to parse
+    S6 -> S6 [label = "E11"]; // no new record yet, keep looking
+    S6 -> Sink2 [label = "EX6"]; // ran out of stream before finding new record
+}
+	

@@ -391,7 +391,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   object E11 extends Event // for the loop in State 6, the probably not a new record event
   object EX1 extends Event // corrupt WARC file, initial record is not a WARC Info object
   object EX3 extends Event // corrupt WARC file, WARC info content ends prematurely
-  object EX5 extends Event // corrput WET archive
+  object EX5 extends Event // corrupt WET archive
   object EX6 extends Event // corrupt WET archive, unable to find subsequent WARC Conversion to parse
   object EX8 extends Event // generic error, we failed to create a complete WARCConversion record
   object ENONE extends Event // it's the non-event ... I'm probably doing something wrong ... :(
@@ -417,7 +417,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   // Sink2 is where we end up if the WET file is corrupt in some way that we couldn't recover
   // from before the stream ends. The only scenario I can think of right now is if a WARC 
   // record had incomplete headers and so we move to state 6 to try to pick up the next record
-  // and hit the end of the stream before we were sucessful.
+  // and hit the end of the stream before we were successful.
   object Sink2 extends State {
     val m = Map[Event, State]()
 
@@ -426,8 +426,8 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     }
   }
 
-  // Final is the final state of the FSA when we finish a complete archive and the achive ends 
-  // cleanly with no half-specificied WARC conversion records. This doesn't mean there wasn't 
+  // Final is the final state of the FSA when we finish a complete archive and the archive ends
+  // cleanly with no half-specified WARC conversion records. This doesn't mean there wasn't
   // corruption on the way, but it wasn't corruption we couldn't recover from and successfully 
   // retrieve records after the point where something went wrong.
   object Final extends State { // this is the final state of the FSA
@@ -443,7 +443,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
   var state1tries = 0
 
   /* State S1
-   * this is the initial state, it parses the headers for the inital WARCInfo object.
+   * this is the initial state, it parses the headers for the initial WARCInfo object.
    * It makes number of required fields (including content as a field) + 4 attempts to 
    * secure a complete set of warcinfo headers before it will transition to an error state
    * (Sink1). This means that if there are a bunch of blank lines at the top of the WET file

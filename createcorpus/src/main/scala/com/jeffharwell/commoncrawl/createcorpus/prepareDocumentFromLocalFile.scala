@@ -2,7 +2,7 @@ package com.jeffharwell.commoncrawl.createcorpus
 
 import scala.io.Source
 
-object prepareDocument {
+object prepareDocumentFromLocalFile {
   def main(args: Array[String]): Unit = {
     //var file = "/home/jharwell/Documents/phd/golden_standard/politics/15302326-94bf-4b7e-b8ef-fdec63f5b1ac.txt"
     //var file = "/home/jharwell/Documents/phd/golden_standard/politics/100adb2c-a2a4-4c54-9a63-e606109a090c.txt"

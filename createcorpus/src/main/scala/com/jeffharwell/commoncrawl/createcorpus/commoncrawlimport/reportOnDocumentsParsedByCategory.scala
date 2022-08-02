@@ -20,19 +20,28 @@ object reportOnDocumentsParsedByCategory {
 
     // Get all the WET Records by category
     val recordsrdd = sc.cassandraTable("pilotparse","wetrecord")
+
+    val all_record_ids = recordsrdd.map(x => x.get[String]("warc_record_id"))
+    val count_of_all_records = all_record_ids.count()
+
     val records_by_category = recordsrdd.map(x => (x.get[String]("warc_record_id"), x.get[Set[String]]("categories")))
+    // It seems like this is recomputed for every count, lets see if caching the
+    // data structure from Cassandra speeds things up.
+    records_by_category.cache()
 
     def one_if_contains(s: (String, Set[String]), p: String): Int = { if (s._2.contains(p)) { 1 } else { 0 }}
 
     val categories = List("guncontrol", "abortion", "evolution", "existenceofgod")
 
-    def countdocuments(category: String): Int = {
+    def count_documents(category: String): Int = {
       records_by_category.map{x => one_if_contains(x, category)}.reduce(_ + _)
     }
 
-    val category_and_count = categories.map(c => c -> countdocuments(c)).toMap
+    val category_and_count = categories.map(c => c -> count_documents(c)).toMap
 
     println("-----------------------------")
+    println(s"${count_of_all_records} distinct documents have been collected.")
+    println("Count of documents per category (some documents may be in more than one category.)")
     println("Category: Number of Documents")
     for ((category, count) <- category_and_count) {
       println(s"$category: $count")

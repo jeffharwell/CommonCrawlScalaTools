@@ -62,6 +62,12 @@ object parseIncompleteWETFilesFromCommoncrawl {
     // the spark context.
     println("\n\n>> Configuring FourForumnsWARCTopicFilter as topic filter.")
     val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter()
+    println("\n\n>> Configuring Thresholds for topic filter")
+    ffc.setMentions("abortion", Map("core" -> 1, "secondary" -> 1))
+    ffc.setMentions("evolution", Map("core" -> 1, "secondary" -> 2))
+    ffc.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 1))
+    ffc.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 1))
+
     val cassandraconf = CassandraConnectorConf(sc.getConf)
     val dcc = new ProcessWETPaths(cc_url, sc.getConf)
     val parsed_records = urls.map(x => dcc.parseWETArchiveURL(x, cassandraconf, ffc))

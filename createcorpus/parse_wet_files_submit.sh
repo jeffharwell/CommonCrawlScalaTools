@@ -14,7 +14,7 @@ SPARK_HOME=${HOME}/bin/spark/spark-2.3.2-bin-hadoop2.7/
 SPARK_CLUSTER="spark://k8v17master.fuller.edu:6066"
 CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.parseWETFilesFromCommoncrawl"
 VERSION=`cat ./build.sbt | grep ^version | awk '{print $3}' | sed 's/"//g'`
-NUMBER_OF_WET_PATHS_TO_SELECT=163
+NUMBER_OF_WET_PATHS_TO_SELECT=512
 
 ###
 #
