@@ -13,10 +13,13 @@ import scala.collection.mutable.ListBuffer
  * The basic idea is that I am looking for keywords that, one, occur a certain number of
  * times and, two, occur in sentences of certain size.
  *
+ * During the creation of the original political and medical corpus (see dissertation, Harwell 2023)
+ * this class was called MyWARCCategorizer.
+ *
  * @param minimummentions The minimum number of times a keyword must appear before the 
  *                        content matches the category. This will default to 7.
  */
-class MyWARCTopicFilter(minimummentions: Int) extends WARCCategorizer {
+class MyWARCTopicFilter(minimummentions: Int) extends WARCTopicFilter {
 
   // Auxilary constructor that sets the minimum number of mentions to 7
   // if no minimum is specified.

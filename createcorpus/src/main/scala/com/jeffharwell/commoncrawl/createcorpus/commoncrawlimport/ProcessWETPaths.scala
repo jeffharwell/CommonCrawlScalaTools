@@ -3,7 +3,7 @@ package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 import com.datastax.spark.connector.types.CassandraOption
 import com.datastax.spark.connector.writer._
 import com.datastax.driver.core.ConsistencyLevel
-import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Parser, ParserTooSlowException, WARCCategorizer, WARCRecord}
+import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Parser, ParserTooSlowException, WARCTopicFilter, WARCRecord}
 import org.apache.spark.SparkConf
 
 import java.io.BufferedInputStream
@@ -53,7 +53,7 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
    */
 
   // Define our function to parse a given WET archive path
-  def parseWETArchiveURL[A <: WARCCategorizer](wet_path: String, cassandraConnectorConf: com.datastax.spark.connector.cql.CassandraConnectorConf, warcCategorizer: A, retries: Integer = 0): List[WARCCassandraBindWithCategories] = {
+  def parseWETArchiveURL[A <: WARCTopicFilter](wet_path: String, cassandraConnectorConf: com.datastax.spark.connector.cql.CassandraConnectorConf, warcCategorizer: A, retries: Integer = 0): List[WARCCassandraBindWithCategories] = {
     val url = new URL(s"$commoncrawl_aws_url$wet_path")
 
     // Create the categorizer

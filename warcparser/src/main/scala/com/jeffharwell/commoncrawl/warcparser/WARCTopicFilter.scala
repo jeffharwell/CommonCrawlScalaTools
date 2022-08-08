@@ -4,8 +4,11 @@ package com.jeffharwell.commoncrawl.warcparser
  * The WARC Categorizer Trait
  *
  * Defines an interface (Java speak) that must be implemented by all WARC Categorizers
+ *
+ * During the creation of the original political and health corpora (see dissertation, Harwell 2023) this
+ * trait was call WARCCategorizer.
  */
-trait WARCCategorizer extends java.io.Serializable {
+trait WARCTopicFilter extends java.io.Serializable {
   /*
    * This method returns true or false depending on if the string s
    * is categorized by the categorizer.

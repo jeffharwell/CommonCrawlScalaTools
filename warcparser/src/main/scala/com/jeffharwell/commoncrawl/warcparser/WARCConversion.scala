@@ -19,20 +19,20 @@ object WARCConversion {
    */
   def apply(): WARCConversion = {
     // Define the absolute minimum WARCCategorizer, it doesn't do anything
-    new WARCConversion(new EmptyCategorizer)
+    new WARCConversion(new EmptyTopicFilter)
   } 
 
   /*
    * In this case an object that is a sub-type of WARCCategorizer has specified
    * been passed, so just pass that to the WARCConversion constructor
    */
-  def apply[A <: WARCCategorizer](c: A): WARCConversion = {
+  def apply[A <: WARCTopicFilter](c: A): WARCConversion = {
     new WARCConversion(c)
   } 
 } 
 
 
-class WARCConversion(acategorizer: WARCCategorizer) extends WARCRecord {
+class WARCConversion(acategorizer: WARCTopicFilter) extends WARCRecord {
 
   val categorizer = acategorizer
 

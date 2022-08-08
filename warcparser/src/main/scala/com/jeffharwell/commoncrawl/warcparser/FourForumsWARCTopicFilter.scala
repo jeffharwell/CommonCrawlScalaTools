@@ -23,7 +23,7 @@ import scala.collection.mutable.ListBuffer
  * minmentions for the core keywords defaults to the number of core keywords specified for the topic. Likewise
  * the minimum number of secondary keywords defaults to the number of secondary keywords specified for the topic.
  */
-class FourForumsWARCTopicFilter() extends WARCCategorizer {
+class FourForumsWARCTopicFilter() extends WARCTopicFilter {
 
   type KeywordStruc = Map[String, List[String]]
   type LookupStruc = Map[Char, List[(String, String, String)]]

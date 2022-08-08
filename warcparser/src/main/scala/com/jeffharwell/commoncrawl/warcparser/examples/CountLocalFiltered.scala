@@ -3,7 +3,7 @@ package com.jeffharwell.commoncrawl.warcparser.examples
 /* Common Crawl Classes */
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
-import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCStreamFilter
 import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
 /* Other Classes */
@@ -57,7 +57,7 @@ object CountLocalFiltered {
        */
 
       // Create the Filter
-      val myfilter = new MyWARCFilter()
+      val myfilter = new MyWARCStreamFilter()
 
       // Create the parser
       val parser = Parser(new BufferedInputStream(new FileInputStream(f)))
@@ -88,7 +88,7 @@ object CountLocalFiltered {
       val f = new File(fileurl.getFile())
 
       // Create the Filter
-      val myfilter = new MyWARCFilter()
+      val myfilter = new MyWARCStreamFilter()
       myfilter.setMinMentions(1)
 
       // Create the categorizer
@@ -222,7 +222,7 @@ object CountLocalFiltered {
         //val u = new File(fileurl.getFile())
 
         // Create the Filter
-        val myfilter = new MyWARCFilter()
+        val myfilter = new MyWARCStreamFilter()
 
         // Create the parser
         var parser_from_aws = Parser(new BufferedInputStream(url.openStream()))
@@ -259,7 +259,7 @@ object CountLocalFiltered {
         val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
 
         // Create the Filter
-        val myfilter = new MyWARCFilter()
+        val myfilter = new MyWARCStreamFilter()
 
         // Create the parser
         val parser_from_aws_2 = Parser(new BufferedInputStream(url.openStream()), c)
@@ -307,7 +307,7 @@ object CountLocalFiltered {
         val c: MyWARCTopicFilter = new MyWARCTopicFilter(1)
 
         // Create the Filter
-        val myfilter = new MyWARCFilter()
+        val myfilter = new MyWARCStreamFilter()
 
         // Create the parser
         val parser6 = Parser(new BufferedInputStream(

@@ -5,7 +5,7 @@ package com.jeffharwell.commoncrawl.warcparser
  * it sees as a document. This is handy if you want a
  * Parser that returns all of the documents that it parses.
  */
-class IdentityTopicFilter() extends WARCCategorizer {
+class IdentityTopicFilter() extends WARCTopicFilter {
   def hasCategories(s: String): Boolean = {
     true
   }

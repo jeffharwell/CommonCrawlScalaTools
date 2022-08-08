@@ -20,8 +20,8 @@ object Parser {
    *
    * @param inputstream a java.io.InputStream giving access to a gzipped WET archive
    */
-  def apply(inputstream: InputStream): Parser[EmptyCategorizer] = {
-    new Parser(inputstream, new EmptyCategorizer, 0)
+  def apply(inputstream: InputStream): Parser[EmptyTopicFilter] = {
+    new Parser(inputstream, new EmptyTopicFilter, 0)
   }
 
   /* 
@@ -32,8 +32,8 @@ object Parser {
    *                  Parser FSA will make before returning with a RuntimeException. Useful
    *                  to protect against infinite loops during testing.
    */
-  def apply(inputstream: InputStream, steplimit: Int): Parser[EmptyCategorizer] = {
-    new Parser(inputstream, new EmptyCategorizer, steplimit)
+  def apply(inputstream: InputStream, steplimit: Int): Parser[EmptyTopicFilter] = {
+    new Parser(inputstream, new EmptyTopicFilter, steplimit)
   }
 
   /*
@@ -44,7 +44,7 @@ object Parser {
    *                    the WARC record. The parser simply passes this to the WARCConversion
    *                    object when it initializes it.
    */
-  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A): Parser[A] = {
+  def apply[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A): Parser[A] = {
     new Parser(inputstream, categorizer, 0)
   }
 
@@ -59,14 +59,14 @@ object Parser {
    *                  Parser FSA will make before returning with a RuntimeException. Useful
    *                  to protect against infinite loops during testing.
    */
-  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int): Parser[A] = {
+  def apply[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A, steplimit: Int): Parser[A] = {
     new Parser(inputstream, categorizer, steplimit)
   }
 
 }
 
 
-class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int) extends Iterator[WARCRecord] {
+class Parser[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A, steplimit: Int) extends Iterator[WARCRecord] {
 
   /*
    * The Constructor
@@ -191,7 +191,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     startTrigger = Some(pt)
 
     // This is a bit tricky. The constructor for the Parser immediately instantiates
-    // an FSA and call privateNext() to parse the first record. This means that by the
+    // an FSA and calls privateNext() to parse the first record. This means that by the
     // time you add a start trigger the Parser has already internally started parsing the
     // file and has either errored out or already internally loaded the first record.
     //
@@ -243,7 +243,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
     // this means that by the time the trigger was added the parse is already done. This could mean
     // that the file was really corrupt and the parser swept through the entire file looking for even
     // one valid WARC Conversion record, or it may not have even been able to find a complete WARC Info
-    // record. This could also mean that the caller add the finish trigger after the parse was already 
+    // record. This could also mean that the caller added the finish trigger after the parse was already
     // completed, in which case we don't know the final state and have to guess a bit as to what happened
     // based on the final state of the parser based on the corruptiondetected flag and the recordcount field.
     def handleNoState(): Some[String] = {
@@ -258,7 +258,7 @@ class Parser[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, ste
       } else if (recordcount > 0) {
         Some("File Parsed Normally and retrieved records ... did you added the trigger after the parse was already done??")
       } else {
-        Some("File Parsed Normally but retreived no WARC Conversion records.")
+        Some("File Parsed Normally but retrieved no WARC Conversion records.")
       }
     }
 

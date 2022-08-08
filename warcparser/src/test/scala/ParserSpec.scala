@@ -3,9 +3,9 @@ import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
 import com.jeffharwell.commoncrawl.warcparser.WARCInfo
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
-import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
+import com.jeffharwell.commoncrawl.warcparser.EmptyTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
-import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
+import com.jeffharwell.commoncrawl.warcparser.WARCTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
 import com.jeffharwell.commoncrawl.warcparser.ParserTooSlowException
 import collection.mutable.Stack
@@ -18,14 +18,14 @@ import java.io.InputStream
 
 object ParserTest {
   def apply(inputstream: InputStream) = {
-    new ParserTest(inputstream, new EmptyCategorizer, 0)
+    new ParserTest(inputstream, new EmptyTopicFilter, 0)
   }
-  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A) = {
+  def apply[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A) = {
     new ParserTest(inputstream, categorizer, 0)
   }
 }
 
-class ParserTest[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
+class ParserTest[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
   /*
    * This class extends Parser and adds a few methods to inspect the internal state
    * so that we can write more specific test
@@ -71,15 +71,15 @@ class ParserTest[A <: WARCCategorizer](inputstream: InputStream, categorizer: A,
 
 object ParserTestLite {
   def apply(inputstream: InputStream) = {
-    new ParserTestLite(inputstream, new EmptyCategorizer, 0)
+    new ParserTestLite(inputstream, new EmptyTopicFilter, 0)
   }
   def apply(inputstream: InputStream, steplimit: Int) = {
-    new ParserTestLite(inputstream, new EmptyCategorizer, steplimit)
+    new ParserTestLite(inputstream, new EmptyTopicFilter, steplimit)
   }
 
 }
 
-class ParserTestLite(inputstream: InputStream, categorizer: EmptyCategorizer, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
+class ParserTestLite(inputstream: InputStream, categorizer: EmptyTopicFilter, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
   /*
    * This class extends Parser and add a few methods to inspect the internal state
    * so that we can write more specific test

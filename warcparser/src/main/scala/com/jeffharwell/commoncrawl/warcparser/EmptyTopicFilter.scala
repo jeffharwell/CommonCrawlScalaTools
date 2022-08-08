@@ -5,7 +5,7 @@ package com.jeffharwell.commoncrawl.warcparser
  * Handy if you want a Parser or WARCConversion object that
  * doesn't actually categorize anything.
  */
-class EmptyCategorizer() extends WARCCategorizer {
+class EmptyTopicFilter() extends WARCTopicFilter {
   val emptyset = Set[String]()
   def hasCategories(s: String): Boolean = {
     false

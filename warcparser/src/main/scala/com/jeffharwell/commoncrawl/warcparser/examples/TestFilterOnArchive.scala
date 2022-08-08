@@ -3,10 +3,10 @@ package com.jeffharwell.commoncrawl.warcparser.examples
 /* Common Crawl Classes */
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
-import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCStreamFilter
 import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
-import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
-import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
+import com.jeffharwell.commoncrawl.warcparser.WARCTopicFilter
+import com.jeffharwell.commoncrawl.warcparser.EmptyTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
 
@@ -30,7 +30,7 @@ object TestFilterOnArchive {
     var url = new URL(urlbase+filepath)
 
     // Create the Filter
-    val myfilter = new MyWARCFilter()
+    val myfilter = new MyWARCStreamFilter()
     myfilter.setDebugMessageLength(700000)
     myfilter.setMaxChunksToCheck(10000)
     myfilter.setDebug()

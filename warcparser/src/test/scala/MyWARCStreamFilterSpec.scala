@@ -2,9 +2,9 @@ import org.scalatest._
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.WARCInfo
-import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCStreamFilter
 
-class MyWARCFilterSpec extends FlatSpec {
+class MyWARCStreamFilterSpec extends FlatSpec {
 
   // Utility class to create a dummy WARCConversion record out of our content string
   // so that we can pass it to the filter for testing.
@@ -49,7 +49,7 @@ class MyWARCFilterSpec extends FlatSpec {
   "MyWARCFilter" should "accept a paragraph that only mentions the keyword once with minmentions = 1" in
   {
     val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val f = new MyWARCFilter()
+    val f = new MyWARCStreamFilter()
     f.setMinMentions(1)
 
     assert(f(crtest1))
@@ -58,7 +58,7 @@ class MyWARCFilterSpec extends FlatSpec {
   "MyWARCFilter" should "reject a paragraph that only mentions the keyword once with minmentions = 2" in
   {
     val crtest1 = createDummyWARCRecordWithContent(testcontent1)
-    val f = new MyWARCFilter()
+    val f = new MyWARCStreamFilter()
     f.setMinMentions(2)
 
     assert(!f(crtest1))
@@ -67,7 +67,7 @@ class MyWARCFilterSpec extends FlatSpec {
   "MyWARCFilter" should "reject text when the keyword only appears in its own line" in
   {
     val crtest1 = createDummyWARCRecordWithContent(taglist)
-    val f = new MyWARCFilter()
+    val f = new MyWARCStreamFilter()
     f.setMinMentions(1)
 
     assert(!f(crtest1))

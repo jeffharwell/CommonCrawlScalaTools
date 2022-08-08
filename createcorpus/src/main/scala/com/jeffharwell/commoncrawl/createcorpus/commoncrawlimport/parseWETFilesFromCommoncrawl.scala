@@ -73,7 +73,7 @@ object parseWETFilesFromCommoncrawl {
 
     // Be CAREFUL! The SparkContext (the sc) can never touch the RDD in any way or you will get a very difficult to
     // troubleshoot NPE. This means that if you put the sc in any function that gets passed to the workers, or inside
-    // a map that is called on an RDD, then, when the statement finally runs on the works it will fail with a Null
+    // a map that is called on an RDD, then, when the statement finally runs on the worker it will fail with a Null
     // Pointer Exception
     //
     // So, as in this case, utilize the sc outside of the RDD and just pass in the final product, in this case

@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
-import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCStreamFilter
 import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
 object hello {

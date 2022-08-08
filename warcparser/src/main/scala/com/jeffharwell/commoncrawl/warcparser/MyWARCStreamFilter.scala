@@ -8,8 +8,11 @@ import scala.collection.mutable.ListBuffer
  *
  * At present this class applies some basic rules to the content of the WARC Record
  * and returns true if it matches false otherwise.
+ *
+ * During the initial run of the health and politics corpus create (referenced in dissertation,
+ * Harwell, 2023) this class was cass MyWARCFilter.
  */
-class MyWARCFilter() extends java.io.Serializable {
+class MyWARCStreamFilter() extends java.io.Serializable {
   /*
    * MyWARCFilter
    *

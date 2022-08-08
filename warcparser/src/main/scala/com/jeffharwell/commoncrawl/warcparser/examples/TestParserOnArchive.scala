@@ -3,10 +3,10 @@ package com.jeffharwell.commoncrawl.warcparser.examples
 /* Common Crawl Classes */
 import com.jeffharwell.commoncrawl.warcparser.Parser
 import com.jeffharwell.commoncrawl.warcparser.WARCRecord
-import com.jeffharwell.commoncrawl.warcparser.MyWARCFilter
+import com.jeffharwell.commoncrawl.warcparser.MyWARCStreamFilter
 import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
-import com.jeffharwell.commoncrawl.warcparser.WARCCategorizer
-import com.jeffharwell.commoncrawl.warcparser.EmptyCategorizer
+import com.jeffharwell.commoncrawl.warcparser.WARCTopicFilter
+import com.jeffharwell.commoncrawl.warcparser.EmptyTopicFilter
 import com.jeffharwell.commoncrawl.warcparser.WARCConversion
 import com.jeffharwell.commoncrawl.warcparser.ParserTrigger
 
@@ -47,18 +47,18 @@ class MyParserTrigger extends ParserTrigger {
 
 object ParserTest {
   def apply(inputstream: InputStream) = {
-    new ParserTest(inputstream, new EmptyCategorizer, 0)
+    new ParserTest(inputstream, new EmptyTopicFilter, 0)
   }
-  def apply[A <: WARCCategorizer](inputstream: InputStream, categorizer: A) = {
+  def apply[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A) = {
     new ParserTest(inputstream, categorizer, 0)
   }
   def apply(inputstream: InputStream, stepLimit: Int) = {
-    new ParserTest(inputstream, new EmptyCategorizer, stepLimit)
+    new ParserTest(inputstream, new EmptyTopicFilter, stepLimit)
   }
 
 }
 
-class ParserTest[A <: WARCCategorizer](inputstream: InputStream, categorizer: A, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
+class ParserTest[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A, steplimit: Int) extends Parser(inputstream, categorizer, steplimit) {
   /*
    * This class extends Parser and adds a few methods to inspect the internal state
    * so that we can write more specific test
@@ -146,7 +146,7 @@ object TestParserOnArchive {
     var url = new URL(urlbase+filepath)
 
     // Create the Filter
-    val myfilter = new MyWARCFilter()
+    val myfilter = new MyWARCStreamFilter()
 
     // Create our finish trigger
     val myFinishTrigger = new MyParserTrigger
