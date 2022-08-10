@@ -55,6 +55,15 @@ class MyWARCStreamFilterSpec extends FlatSpec {
     assert(f(crtest1))
   }
 
+  "MyWARCFilter" should "accept a sentence that only mentions the keyword once with minmentions = 1" in
+    {
+      val crtest1 = createDummyWARCRecordWithContent(testcontent2)
+      val f = new MyWARCStreamFilter()
+      f.setMinMentions(1)
+
+      assert(f(crtest1))
+    }
+
   "MyWARCFilter" should "reject a paragraph that only mentions the keyword once with minmentions = 2" in
   {
     val crtest1 = createDummyWARCRecordWithContent(testcontent1)
@@ -91,6 +100,11 @@ class MyWARCStreamFilterSpec extends FlatSpec {
 
   def testcontent1 = """
 Theres a CrossFit affiliate gym 4 blocks from my house. Everytime I drive by there and want to stop in, Im intimidated by the men and women beasting out there lol. I soooo want to do this. Im going to start on some of the excercises you can do at home. But does anyone recommend any lifting regiments for a starter? I have never lifted really but have decent upper body strength. Im going to need a scaled suggestion. I know the 1-1-1-1-1-1-1 to start out. But is that 1 rep, 7 sets of lifting excercises like curls. Then repeat the 1-1-1-1-1-1-1 for say triceps? Is there a specific order of lifting excercises/motions I should be doing? Sorry for the super noob questions. Ive never really worked out hardcore or had a set regiment due to hardcore asthma I used to have. Its since gotten way better than when I was a kid, but still there. I still play soccer, go jogging, etc. But I NEED something more. I read through a whole bunch of pages, but wasnt able to get through all 93 lol. HELP! Thanks!
+"""
+
+  def testcontent2 =
+    """
+This is a sentence that mentions Clinton in a string more than 7 words long. But it only mentions it once.
 """
 
   def taglist = """

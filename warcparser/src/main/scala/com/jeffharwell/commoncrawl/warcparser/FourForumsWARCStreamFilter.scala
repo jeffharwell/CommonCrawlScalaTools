@@ -12,7 +12,7 @@ import scala.collection.mutable.ListBuffer
  * During the initial run of the health and politics corpus create (referenced in dissertation,
  * Harwell, 2023) this class was cass MyWARCFilter.
  */
-class MyWARCStreamFilter() extends WARCStreamFilter {
+class FourForumsWARCStreamFilter() extends WARCStreamFilter {
   /*
    * MyWARCFilter
    *
@@ -25,15 +25,15 @@ class MyWARCStreamFilter() extends WARCStreamFilter {
    * I expect it to need to filter around 1 billion documents and extract the .1% that are
    * actually interesting for my research.
    */
-  val keywords = List[String]("trump","clinton","presidential","asthma")
+  val keywords = List[String]("abortion","gun","evolution","god")
 
   // controls how many times a keyword must be mentioned in the 
-  // content before it is considered a match. Defaults to 7.
-  var minimummentions = 7
+  // content before it is considered a match. Defaults to 1.
+  var minimummentions = 1
 
   var debug = false
   var debug_message_length = 500000
-  // this contols the maximum number of chunks that the detailed test with check for
+  // this controls the maximum number of chunks that the detailed test will check for
   // the presence of keywords.
   var max_chunks_to_check = 5000
 
@@ -54,7 +54,7 @@ class MyWARCStreamFilter() extends WARCStreamFilter {
    */
   def setDebug() {
     debug = true
-    println("Debugging is on for MyWARCFilter")
+    println("Debugging is on for FourForumnsWARCStreamFilter")
     println(s"  Debugging output for records where length > ${debug_message_length}")
     println(s"  Will only check a maximum of ${max_chunks_to_check} chunks when doing a detailed check.")
   }
@@ -103,7 +103,7 @@ class MyWARCStreamFilter() extends WARCStreamFilter {
     // detailCheck is the more expensive check 
     if (debug && w.fields("Content").length > debug_message_length) { println(s"Processing Record ${w.get("WARC-Record-ID")} of length ${w.fields("Content").length}") }
     var start_time = System.currentTimeMillis()
-    if (containsKeywords(w.fields("Content"), minimummentions)) { 
+    if (containsKeywords(w.fields("Content"), minimummentions)) {
       var end_time = System.currentTimeMillis()
       if (debug && w.fields("Content").length > debug_message_length) { println(s"Running containsKeywords took ${end_time - start_time} ms") }
       detailCheck(w)
@@ -198,6 +198,7 @@ class MyWARCStreamFilter() extends WARCStreamFilter {
                                   else { checkChunks(valid_chunks, chunk_number_cutoff) }
                                 }
     end_time = System.currentTimeMillis()
+
     if (debug && chunks.length > max_chunks_to_check) { println(s"checkChunks ran in ${end_time - start_time} ms") }
     has_mentions
   }
@@ -246,7 +247,7 @@ class MyWARCStreamFilter() extends WARCStreamFilter {
           matches += 1
         }
         */
-        // regionMatches runs one or two seconds faster overall on a WARC file than the src.slice version above
+        // regionMatches runs one on two seconds faster overall on a WARC file than the src.slice version above
         if (src.regionMatches(true, i, what, 0, length)) {
           matches += 1
         }
