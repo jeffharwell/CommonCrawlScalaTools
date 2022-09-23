@@ -6,10 +6,10 @@ package com.jeffharwell.commoncrawl.warcparser
  * Parser that returns all of the documents that it parses.
  */
 class IdentityTopicFilter() extends WARCTopicFilter {
-  def hasCategories(s: String): Boolean = {
+  def hasCategories[A <: WARCRecord](w: A): Boolean = {
     true
   }
-  def getCategories(s: String): Set[String] = {
+  def getCategories[A <: WARCRecord](w: A): Set[String] = {
     Set[String]("document")
   }
 }

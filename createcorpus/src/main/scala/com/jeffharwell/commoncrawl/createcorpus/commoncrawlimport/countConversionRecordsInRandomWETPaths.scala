@@ -9,29 +9,21 @@ import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Identi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-object generateClassifierStatisticsFromRandomWETPaths {
+object countConversionRecordsInRandomWETPaths {
   def main(args: Array[String]) {
-
-    // Bind function, takes our data and binds it to the Cassandra table so that it can be written later
-    def bindToCassandraTable(wc: WARCRecord, category: String, core_keywords_count: Int, secondary_keywords_count: Int): ClassifiedWARCDocument = {
-      ClassifiedWARCDocument(CassandraOption.unsetIfNone(wc.get("WARC-Record-ID")),
-        category,
-        core_keywords_count,
-        secondary_keywords_count)
-    }
 
     // First set up the Spark context and point it to the Cassandra cluster.
     // The DNS name cassandra.default.svc.cluster.local resolves to the correct Cassandra
     // cluster within Kubernetes
     val conf = new SparkConf()
-      .setAppName("importcommoncrawl")
+      .setAppName("countconversionrecords")
       .set("spark.cassandra.connection.host", "cassandra.default.svc.cluster.local")
     val sc = new SparkContext(conf)
     val ignoreNullsWriteConf: WriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true,
       consistencyLevel = ConsistencyLevel.ONE)
 
     print("\n\n>>>>>> START OF PROGRAM <<<<<<\n\n");
-    println("Parsing WET Files from Common Crawl");
+    println("Parsing Random WET Files from Common Crawl");
     println("Running on Spark version: " + sc.version)
 
     val cc_url: String = "https://data.commoncrawl.org"
@@ -70,38 +62,14 @@ object generateClassifierStatisticsFromRandomWETPaths {
       record <- record_list
     } yield (record)
 
-    // 3) Categorize all texts
-    //      We want to raw counts from the classifier, so run each text back through the classifier, probably
-    //      want to return a set up tuples (class, core_keyword_count, secondary_keyword_count) with unclassified
-    //      documents getting ('unclassified', 0, 0)
-    //      RDD Parsed Document -> RDD of ClassifiedWARCDocument
+    // Now grab all the warc record ids from all the WARCCassandraBindWithCategories case classes
+    val all_record_ids = for {
+      case_class <- parsed_records_rdd
+      warc_id <- case_class.warc_record_id
+    } yield (warc_id)
 
-    // Create our classifier, if the document contains a core keyword, we classify it. It doesn't matter too much
-    // though, because we we are interested in is the count of all string matches for each category. This will be
-    // output regardless of whether or not a document is classified.
-    val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter()
-
-    def categorizeAndBind(warc_record_id: String, document_content: String): List[ClassifiedWARCDocument] = {
-      // Even if no documents get categorized the categorizer will spit out a data structure that contains the
-      // each category and the number of core and secondary words that matched in the document. This is the structure
-      // we want to persist to cassandra. For a given category we can look at all the document and tell which
-      // documents did not match at all, and then the counts of core and secondary words for any matches at all.
-      val output = ffc.categorizeAndCountString(document_content)
-      val l = for {
-        x <- output._2 // Map[String, (Int, Int)] containing category name and match counts, Map[Category Name, (count of core matches, count of secondary matches)]
-      } yield ClassifiedWARCDocument(Some(warc_record_id), x._1, x._2._1, x._2._2)
-      l.toList
-    }
-
-    val classifications: RDD[List[ClassifiedWARCDocument]] = for {
-      warcbind <- parsed_records_rdd
-      content <- warcbind.content
-      id <- warcbind.warc_record_id
-    } yield categorizeAndBind(id, content)
-
-    // 4) Write to Cassandra
-
-    classifications.flatMap(identity).saveToCassandra("pilotparse", "classified_warc_document")
+    println(s"Total number of warc record ids: ${all_record_ids.count()}")
+    println(s"Total distinct warc record ids: ${all_record_ids.distinct().count()}")
 
     print("\n\n>>>>>> END OF PROGRAM <<<<<<\n\n")
   }

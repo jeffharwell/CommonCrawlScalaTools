@@ -30,7 +30,7 @@ object createListOfRandomWETPaths {
 
     // Get a few random wetpaths that we have not processed yet
     val getwetpaths = new GetWETPaths(sc)
-    val r = getwetpaths.getRandomWETPaths(50)
+    val r = getwetpaths.getRandomWETPaths(100)
 
     // the x._2 is a Boolean which indicates whether we have finished processing the path yet,
     // this will always be false because of the way getRandomWETPaths is implemented, and we don't care

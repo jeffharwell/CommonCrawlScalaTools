@@ -1,5 +1,7 @@
 package com.jeffharwell.commoncrawl.warcparser
 
+import com.datastax.spark.connector.cql.CassandraConnectorConf
+
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -32,10 +34,13 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
   var minimummentions = 1
 
   var debug = false
+  var stats = false
   var debug_message_length = 500000
   // this controls the maximum number of chunks that the detailed test will check for
   // the presence of keywords.
   var max_chunks_to_check = 5000
+
+  var stats_writer: Option[StatsWriter] = None
 
   // Setter for Minimum Mentions
   def setMinMentions(i :Int): Unit = {
@@ -45,6 +50,33 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
   // Getter for Minimum Mentions
   def getMinMentions(): Int = {
     return(minimummentions)
+  }
+
+  // We are going to be collecting stats and saving them to Cassandra
+  // Add the stats writer to the object.
+  def setStatsWriter[A <: StatsWriter](writer: StatsWriter): Unit = {
+    if (!stats) {
+      stats = true
+      stats_writer = Some(writer)
+    }
+  }
+
+  def writeStats(warc_record: WARCRecord, measurement_type: String, measurement: Long): Unit = {
+    // If we have a stats_writer defined, then write the statistic we have been passed
+    // otherwise do nothing.
+    stats_writer match {
+      case Some(w: StatsWriter) => w(warc_record, measurement_type, measurement)
+      case _ => None
+    }
+  }
+
+  def writeStatsCompact(warc_record: WARCRecord, description: String, value_one: Long, value_two: Long, value_three: Long, processing_time: Long): Unit = {
+    // If we have a stats_writer defined, then write the statistic we have been passed
+    // otherwise do nothing.
+    stats_writer match {
+      case Some(w: StatsWriter) => w(warc_record, description, value_one, value_two, value_three, processing_time)
+      case _ => None
+    }
   }
 
   /*
@@ -102,12 +134,33 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
     //
     // detailCheck is the more expensive check 
     if (debug && w.fields("Content").length > debug_message_length) { println(s"Processing Record ${w.get("WARC-Record-ID")} of length ${w.fields("Content").length}") }
-    var start_time = System.currentTimeMillis()
+    // writeStats(w, "document content length", w.fields("Content").length)
+    //var start_time = System.currentTimeMillis()
+    val filter_start_time = System.nanoTime()
+    val start_time = System.nanoTime()
     if (containsKeywords(w.fields("Content"), minimummentions)) {
-      var end_time = System.currentTimeMillis()
+      //var end_time = System.currentTimeMillis()
+      val end_time = System.nanoTime()
+      //val write_start_time = System.nanoTime()
+      //writeStats(w, "first check duration (ns)", end_time - start_time)
+      //val write_end_time = System.nanoTime()
+      //writeStats(w, "time to write stats", write_end_time - write_start_time)
       if (debug && w.fields("Content").length > debug_message_length) { println(s"Running containsKeywords took ${end_time - start_time} ms") }
-      detailCheck(w)
-    } else { 
+      if (detailCheck(w)) {
+        //writeStats(w, "document accepted after detail check", 1)
+        //writeStats(w, "total filter processing time (ns)", System.nanoTime() - filter_start_time)
+        writeStatsCompact(w, "result", 1, 0, 0, System.nanoTime() - filter_start_time)
+        true
+      } else {
+        //writeStats(w, "document reject after detail check", 1)
+        //writeStats(w, "total filter processing time (ns)", System.nanoTime() - filter_start_time)
+        writeStatsCompact(w, "result", 0, 1, 0, System.nanoTime() - filter_start_time)
+        false
+      }
+    } else {
+      //writeStats(w, "document rejected no detail check", 1)
+      //writeStats(w, "total filter processing time (ns)", System.nanoTime() - filter_start_time)
+      writeStatsCompact(w, "result", 0, 0, 1, System.nanoTime() - filter_start_time)
       false
     }
   }
@@ -129,7 +182,8 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
     // Throw out the chunks that don't match our criteria
     // Run cimatch over the remaining chunks
 
-    var start_time = System.currentTimeMillis()
+    //var start_time = System.currentTimeMillis()
+    var start_time = System.nanoTime()
     /* The functional one liner, it is A LOT slower than the imperative version below with uses the list buffer
      * 33236 ms to generate 46,000 chunks vs 39 ms for the imperative version 
      *
@@ -144,9 +198,12 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
       chunks.appendAll(x.split("\\. "))
     }
 
-    var end_time = System.currentTimeMillis()
+    //var end_time = System.currentTimeMillis()
+    val chunk_end_time = System.nanoTime()
 
-    if (debug && chunks.length > max_chunks_to_check) { println(s"Generated ${chunks.length} chunks in ${end_time - start_time} ms") }
+    //writeStats(wrecord, "number of chunks generated", chunks.length)
+    //writeStats(wrecord, "chunk generation time (ns)", chunk_end_time - start_time)
+    if (debug && chunks.length > max_chunks_to_check) { println(s"Generated ${chunks.length} chunks in ${chunk_end_time - start_time} ms") }
     
     // checkChunks is expensive and will run for a long time if you process tens of thousands or hundreds of thousands 
     // of chunks, especially of those chunks are small.
@@ -166,10 +223,11 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
     // We might still get a really large number of chunks to check, we are only going to process the first X thousand
     // We don't want to run for more than a few minutes or it might cause problems, especially if this is being used 
     // as the filter on a network stream .. things will start timing out.
+    //writeStats(wrecord, "number appropriate chunks", valid_chunks.length)
     if (debug && chunks.length > max_chunks_to_check) { println(s"Found ${valid_chunks.length} chunks of appropriate size to check") }
 
     // Calculate the chunk number to which we will process before quiting based on the max_chunks_to_check
-    var chunk_number_cutoff = {
+    val chunk_number_cutoff = {
       if (valid_chunks.length > max_chunks_to_check) {
         valid_chunks.length - max_chunks_to_check 
       } else {
@@ -192,14 +250,21 @@ class FourForumsWARCStreamFilter() extends WARCStreamFilter {
                                                        // all the chunks we should check and not found anything, return false.
       else { checkChunks(t, cutoff) }
     }
-    start_time = System.currentTimeMillis()
+    //start_time = System.currentTimeMillis()
+    start_time = System.nanoTime()
     // don't pass checkChunks an empty list, it bombs out on chunks.head
-    var has_mentions: Boolean = { if (valid_chunks.length == 0) { false }
+    var has_mentions: Boolean = { if (valid_chunks.isEmpty) { false }
                                   else { checkChunks(valid_chunks, chunk_number_cutoff) }
                                 }
-    end_time = System.currentTimeMillis()
+    //end_time = System.currentTimeMillis()
+    val check_end_time = System.nanoTime()
 
-    if (debug && chunks.length > max_chunks_to_check) { println(s"checkChunks ran in ${end_time - start_time} ms") }
+    // writeStats(wrecord, "check chunks runtime (ns)", check_end_time - start_time)
+    // description, number of chunks generated, chunk generation time, number of valid chunks, detail check processing time
+    writeStatsCompact(wrecord, s"detailcheck: chunk gen time, total chunks, valid chunks, total check time",
+      chunk_end_time - start_time, chunks.length, valid_chunks.length, check_end_time - start_time)
+
+    if (debug && chunks.length > max_chunks_to_check) { println(s"checkChunks ran in ${check_end_time - start_time} ns") }
     has_mentions
   }
 

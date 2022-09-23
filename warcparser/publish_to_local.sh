@@ -1,5 +1,8 @@
 #!/bin/bash
 
+VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
+rm -fr /home/jharwell/.ivy2/local/com.jeffharwell/warcparser_2.11/${VERSION}
+
 sbt publishLocal
 stty echo
 exit
@@ -15,6 +18,8 @@ VERSION=`cat ./build.sbt | grep version | awk '{print $3}' | sed 's/"//g'`
 NAME="warcparser"
 ORGANIZATION="com.jeffharwell"
 LOCALMAVENREPO=${HOME}/.m2/repository
+
+
 
 sbt package
 

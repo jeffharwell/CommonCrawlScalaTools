@@ -7,10 +7,10 @@ package com.jeffharwell.commoncrawl.warcparser
  */
 class EmptyTopicFilter() extends WARCTopicFilter {
   val emptyset = Set[String]()
-  def hasCategories(s: String): Boolean = {
+  def hasCategories[A <: WARCRecord](w: A): Boolean = {
     false
   }
-  def getCategories(s: String): Set[String] = {
+  def getCategories[A <: WARCRecord](w: A): Set[String] = {
     emptyset
   }
 }

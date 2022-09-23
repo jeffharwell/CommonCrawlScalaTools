@@ -30,6 +30,13 @@ class GetWETPaths(spark_context: SparkContext) {
     incomplete_list.toList
   }
 
+  def selectTenRandomWETPaths(): List[String] = {
+    val wet_paths = sc.cassandraTable("pilotparse", "random_wetpaths")
+    val all_rdd = wet_paths.map { x => x.get[String]("wet_path")}
+    val all = all_rdd.collect()
+    all.toList.slice(0, 10)
+  }
+
   def getRandomWETPaths(numberOfPaths: Integer): List[(String, Boolean)] = {
     /*
      * Creates a vector of ${numberOfPaths} random WET archive URLs for us to parse later

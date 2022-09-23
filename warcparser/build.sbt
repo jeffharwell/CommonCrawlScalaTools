@@ -2,7 +2,7 @@ organization := "com.jeffharwell"
 
 name := "WARCParser"
 
-version := "0.0.30"
+version := "0.0.34"
 publishMavenStyle := true
 
 //scalaVersion := "2.12.0"
@@ -16,6 +16,9 @@ scalacOptions :=
 
 // Realtime Output Please
 logBuffered in Test := false
+
+// For logging and collecting algorithm stats in Spark
+libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "2.3.2"
 
 // Adds dependency on typesafe config reader
 libraryDependencies += "com.typesafe" % "config" % "1.3.1"

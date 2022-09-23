@@ -3,10 +3,12 @@ package com.jeffharwell.commoncrawl.createcorpus
 import scala.collection.mutable.ListBuffer
 import java.io.StringReader
 import java.util.regex.Pattern
-import edu.stanford.nlp.process.PTBTokenizer
-import edu.stanford.nlp.process.CoreLabelTokenFactory
 import java.security.MessageDigest
 import java.math.BigInteger
+import scala.annotation.tailrec
+import scala.collection.mutable
+import edu.stanford.nlp.process.PTBTokenizer
+import edu.stanford.nlp.process.CoreLabelTokenFactory
 
 
 /*
@@ -20,13 +22,13 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   /*
    * Deal with counting and classifying tokens
    */
-  var alpha_num_pattern = Pattern.compile("[A-Za-z0-9'`]+")
-  var upper_pattern = Pattern.compile("^[A-Z].*")
-  var terminator_pattern = Pattern.compile("[.!?][\"']*$")
-  var openingdoublequote_pattern = Pattern.compile("``") // Tokenizer converts opening " to `` 
-  var closingdoublequote_pattern = Pattern.compile("''") // Tokenizer converts closing " to ''
-  var singlequote_pattern = Pattern.compile("'") // Tokenizer leaves single quotes alone
-  var numeric_pattern = Pattern.compile("[0-9]+")
+  var alpha_num_pattern: Pattern = Pattern.compile("[A-Za-z0-9'`]+")
+  var upper_pattern: Pattern = Pattern.compile("^[A-Z].*")
+  var terminator_pattern: Pattern = Pattern.compile("[.!?][\"']*$")
+  var openingdoublequote_pattern: Pattern = Pattern.compile("``") // Tokenizer converts opening " to ``
+  var closingdoublequote_pattern: Pattern = Pattern.compile("''") // Tokenizer converts closing " to ''
+  var singlequote_pattern: Pattern = Pattern.compile("'") // Tokenizer leaves single quotes alone
+  var numeric_pattern: Pattern = Pattern.compile("[0-9]+")
   var max_tokens_before_sentence_end = 70
   var debug = false
 
@@ -50,11 +52,11 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   }
 
   def countAlphaNum(tokens: ListBuffer[String]): Int = {
-    tokens.map(count_if_alpha_num).reduce(_ + _)
+    tokens.map(count_if_alpha_num).sum
   }
 
   def countNumeric(tokens: ListBuffer[String]): Int = {
-    tokens.map(count_if_numeric).reduce(_ + _)
+    tokens.map(count_if_numeric).sum
   }
 
   /*
@@ -70,11 +72,11 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   }
 
   def tokenize_line(line: String): ListBuffer[String] = {
-    var line_as_reader = new StringReader(line)
-    var ptbt = new PTBTokenizer(line_as_reader, new CoreLabelTokenFactory(), "")
-    var tokens = new ListBuffer[String]()
-    while (ptbt.hasNext()) {
-      var label = ptbt.next()
+    val line_as_reader = new StringReader(line)
+    val ptbt = new PTBTokenizer(line_as_reader, new CoreLabelTokenFactory(), "")
+    val tokens = new ListBuffer[String]()
+    while (ptbt.hasNext) {
+      val label = ptbt.next()
       if (debug) println(label)
       tokens += label.originalText() //edu.stanford.nlp.ling.CoreLabel
     }
@@ -82,8 +84,8 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   }
 
   /*
-   * We want allow sentencs to start with something like "( or "[. These are converted
-   * into tokens ['"', "-LRB-"] but the PTBTokenizer. Need to handle that in the 
+   * We want allow sentences to start with something like "( or "[. These are converted
+   * into tokens ['"', "-LRB-"] by the PTBTokenizer. Need to handle that in the
    * code that finds the start of sentences
    *
    * https://www.nltk.org/_modules/nltk/tokenize/treebank.html
@@ -108,8 +110,8 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     }
   }
 
-  var valid_opening_brackets = List[String]("-LRB-","-LSB-","-LCB-")
-  var valid_quotes = List[String]("`","'","''","``")
+  var valid_opening_brackets: List[String] = List[String]("-LRB-","-LSB-","-LCB-")
+  var valid_quotes: List[String] = List[String]("`","'","''","``")
 
   @scala.annotation.tailrec
   final def getSentenceAdditionalStartCharacters(previous_tokens: List[String], sentence_start: String = ""): Option[String] = {
@@ -126,19 +128,19 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     // previous_tokens = ["-LRB-", "-LCB-", "'"] would return the string "("
     if (debug) print("Getting the string representation of relevant additional PTB starting characters, looking at: ")
     if (debug) println(previous_tokens)
-    if (previous_tokens.length == 0) {
+    if (previous_tokens.isEmpty) {
       // well, that was easy
       None
     } else {
-      var h = previous_tokens.head
+      val h = previous_tokens.head
       if ((valid_opening_brackets contains h) && (sentence_start == "")) { // we only accept an opening bracket as the first character before the capitalized token
         // we have a bracket
-        var translated: String = translateTreebankToken(h)
+        val translated: String = translateTreebankToken(h)
         // and recurse
         getSentenceAdditionalStartCharacters(previous_tokens.tail, translated + sentence_start)
       } else if (valid_quotes contains h) {
         // we have a quote
-        var translated: String = translateTreebankToken(h)
+        val translated: String = translateTreebankToken(h)
         // once we hit a quote we are done, return what we have got
         Some(translated + sentence_start)
       } else {
@@ -153,15 +155,15 @@ class PrepareDocument(document: String) extends java.io.Serializable {
 
   @scala.annotation.tailrec
   final def findSentenceStartIndex(textblock: String, tokens: ListBuffer[String], previous_tokens: List[String] = List[String]()): Option[Int] = {
-    var h = tokens.head
+    val h = tokens.head
     if (upper_pattern.matcher(h).find()) {
       // alright, we have the token that starts the sentence, now what else could be in front that could
       // also be part of the sentence?
-      var other_characters: Option[String] = getSentenceAdditionalStartCharacters(previous_tokens)
+      val other_characters: Option[String] = getSentenceAdditionalStartCharacters(previous_tokens)
       if (other_characters.isDefined) {
         // Trickier, we have tokens that might be part of the start of the sentence. For example the 
         // string "[Bob] did the thing!" previous = "[ and h = Bob. getStartIndexWithAdditionalCharacters
-        // handles the case where the textblock actually has the value " [ Bob] did the thing!" and we need
+        // handles the case where the text block actually has the value " [ Bob] did the thing!" and we need
         // to find the index of the opening double quotes.
         getStartIndexWithAdditionalStartCharacters(textblock, other_characters.get, h)
       } else {
@@ -171,7 +173,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
         Some(textblock indexOf h)
       }
     } else if (tokens.length > 1) { // we did not find an token that starts with a capital letter, but have some tokens left, keep looking
-      var new_previous: List[String] = h :: previous_tokens // adds the current head token to the front of the previous tokens list
+      val new_previous: List[String] = h :: previous_tokens // adds the current head token to the front of the previous tokens list
       findSentenceStartIndex(textblock, tokens.tail, new_previous)
     } else {
       None
@@ -255,14 +257,15 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // brackets, and double quotes (including unicode closing quote) and single quotes (including
   // unicode closing single quote).
   def adjustIndexForAdditionalCharacters(textblock: String, ending_index: Int): Int = {
-    var valid_additional_ending_characters = List('\u201d','\u2019','"','\'','\u2019',']',')')
-    var search_index = ending_index + 1
+    val valid_additional_ending_characters = List('\u201d','\u2019','"','\'','\u2019',']',')')
+    val search_index = ending_index + 1
 
+    @tailrec
     def findNewIndex(ending_index: Int, search_index: Int): Int = {
       if (search_index >= textblock.length) {
         // We just overran the end of the string, return whatever we may have found
         ending_index
-      } else if (valid_additional_ending_characters.exists(_ == textblock(search_index))) {
+      } else if (valid_additional_ending_characters.contains(textblock(search_index))) {
         // this could be a contender, set it as the next ending and keep looking
         findNewIndex(search_index, search_index + 1)
       } else if (' ' == textblock(search_index)) {
@@ -279,16 +282,16 @@ class PrepareDocument(document: String) extends java.io.Serializable {
 
   // Pretty Simple, if the string s ends with any of the invalid_endings in the ListBuffer
   // it will return true, false otherwise
-  // Basically the the PTB tokenizer works through a sentence it will catch things like
+  // Basically when the PTB tokenizer works through a sentence it will catch things like
   // Mr. Ms. Jr. Rev. and other common abbreviations and consider them a distinct token,
   // so if you pass all of the tokens that end in a period to this function as invalid_endings
   // it will tell you if your current string ends with one of those endings
   @scala.annotation.tailrec
   final def endsWithInvalid(s: String, invalid_endings: ListBuffer[String]): Boolean = {
-    if (invalid_endings.length == 0) {
+    if (invalid_endings.isEmpty) {
       false
     } else {
-      var ending = invalid_endings.head
+      val ending = invalid_endings.head
       if (s.endsWith(ending)) {
         true
       } else {
@@ -297,7 +300,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     }
   }
 
-  // Little function which evaluates the textblock at the current index to see if the current index
+  // Little function which evaluates the text block at the current index to see if the current index
   // represents a valid sentence ending. It much be passed a list buffer which contains all tokens 
   // that end with a period but do not constitute a sentence ending.
   // This also takes care of cases where you have multiple periods in a row or cases where there is a 
@@ -359,7 +362,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // Look through the textblock backwards, character by character, and return the index that marks the end
   // of the last sentence in the textblock..
   def findSentenceEndIndex(textblock: String, tokens: ListBuffer[String]): Option[Int] = {
-    if (textblock.length == 0) {
+    if (textblock.isEmpty) {
       None
     }
     def ends_with_period(x: String): Boolean = {
@@ -369,9 +372,11 @@ class PrepareDocument(document: String) extends java.io.Serializable {
         false
       }
     }
-    var tokenizer_invalid_endings = tokens.filter(ends_with_period(_))
-    var other_invalid_endings = List("Ret.")
-    var invalid_endings = tokenizer_invalid_endings ++ other_invalid_endings
+    val tokenizer_invalid_endings = tokens.filter(ends_with_period)
+    val other_invalid_endings = List("Ret.")
+    val invalid_endings = tokenizer_invalid_endings ++ other_invalid_endings
+
+    @tailrec
     def findIndex(textblock: String, index: Int): Option[Int] = {
       if (index == 0) {
         // we went all the way through the sentence and didn't find anything
@@ -380,9 +385,9 @@ class PrepareDocument(document: String) extends java.io.Serializable {
       } else if (isValidSentenceEnding(textblock, index, invalid_endings)) {
         // We have a sentence ending, see if there are any additional characters to tack onto
         // sentence (quotes, etc.)
-        var new_index = adjustIndexForAdditionalCharacters(textblock, index)
+        val new_index = adjustIndexForAdditionalCharacters(textblock, index)
         if (new_index == index && !hasSpaceOrEndingNext(textblock, index)) {
-          if (debug) println(s"Rejected a sentence ending at index = ${index} because it did not have a space, line ending, or valid additional characters after it")
+          if (debug) println(s"Rejected a sentence ending at index = $index because it did not have a space, line ending, or valid additional characters after it")
           // there are no additional charcters, to account for the fact that this
           // doesn't actually seem to be the end of a sentence, reject it, and keep going
           findIndex(textblock, index - 1)
@@ -400,11 +405,11 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   }
 
   def findIndexOfFirstSentenceEndingToken(tokens: ListBuffer[String]): Option[Int] = {
-    var sentence_ending_tokens = List(".","!","?")
+    val sentence_ending_tokens = List(".","!","?")
 
-    var earliest_ending_token = sentence_ending_tokens.map( x => tokens.indexOf(x)).filter(_ != -1)
-    if (earliest_ending_token.length > 0) {
-      if (debug) println(s"Earliest ending token is: ${earliest_ending_token}")
+    val earliest_ending_token = sentence_ending_tokens.map( x => tokens.indexOf(x)).filter(_ != -1)
+    if (earliest_ending_token.nonEmpty) {
+      if (debug) println(s"Earliest ending token is: $earliest_ending_token")
       Some(earliest_ending_token.min)
     } else {
       None
@@ -415,78 +420,80 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // Clean the text block by removing anything from the beginning that does not belong to a sentence
   // (as best we can tell) and anything from the end that does not belong to a sentence (again, as best
   // we can tell ... a lot of this stuff isn't in complete sentences anyways.)
-  def cleanTextblock(textblock: String): Option[String] = {
-    var tokens = tokenize_line(textblock)
-    var start: Option[Int] = findSentenceStartIndex(textblock, tokens)
-    var earliest_ending: Option[Int] = findIndexOfFirstSentenceEndingToken(tokens)
+  def cleanTextBlock(textblock: String): Option[String] = {
+    val tokens = tokenize_line(textblock)
+    val start: Option[Int] = findSentenceStartIndex(textblock, tokens)
+    val earliest_ending: Option[Int] = findIndexOfFirstSentenceEndingToken(tokens)
     if (start.isDefined && earliest_ending.isDefined && earliest_ending.get < max_tokens_before_sentence_end) {
-      if (debug) println(s"Start index is: ${start}")
-      var end: Option[Int] = findSentenceEndIndex(textblock, tokens)
+      if (debug) println(s"Start index is: $start")
+      val end: Option[Int] = findSentenceEndIndex(textblock, tokens)
       if (end.isDefined && start.get <= end.get) {
-        if (debug) println(s"End index is: ${end}")
+        if (debug) println(s"End index is: $end")
         Some(textblock.slice(start.get, end.get + 1))
       } else {
-        if (debug && end.isDefined) println(s"Found end ${end} but it is less than start ${start}, discarding block.")
-        if (debug && !end.isDefined) println("Did not found a valid sentence ending. Discarding block.")
+        if (debug && end.isDefined) println(s"Found end $end but it is less than start $start, discarding block.")
+        if (debug && end.isEmpty) println("Did not found a valid sentence ending. Discarding block.")
         None
       }
     } else {
-      if (!earliest_ending.isDefined) {
+      if (earliest_ending.isEmpty) {
         if (debug) println(s"No sentence endings at all were found in the textblock, discarding.")
       } else if (earliest_ending.get > max_tokens_before_sentence_end) {
-        if (debug) println(s"Rejected textblock because the earlist end token occurred at token ${earliest_ending.get}, which is larger than the the maximum tokens that can occur before a sentence ending, ${max_tokens_before_sentence_end}")
+        if (debug) println(s"Rejected textblock because the earlist end token occurred at token ${earliest_ending.get}, which is larger than the the maximum tokens that can occur before a sentence ending, $max_tokens_before_sentence_end")
       }
-      if (!start.isDefined) {
+      if (start.isEmpty) {
         if (debug) println("Rejected textblock because no valid sentence starting sequence was found")
       }
       None
     }
   }
 
-  def keep_line(line: String, in_textblock: Boolean): Boolean = {
-    var tokens = tokenize_line(line)
-    // hmm, this avoids computation until it is absolutely necessary
-    // but it is certainly ugly to code. I guess it is a guard type
-    // of pattern
-    // This is from Laippala and Ginter 2014
-    // They discarded lines that were 5 or less tokens, less than 70% alpha
-    // (words, alphabetical is my interpretation of not "special character tokens")
-    // or greater than 20% numeric
+  def keepLine(line: String, in_textblock: Boolean): Boolean = {
+    val tokens = tokenize_line(line)
+    /* hmm, this avoids computation until it is absolutely necessary
+     * but it is certainly ugly to code. I guess it is a guard type
+     * of pattern.
+     *
+     * This is from Kanerva et al. 2014
+     * They discarded lines that were 5 or less tokens, less than 70% alpha
+     * (words, alphabetical is my interpretation of not "special character tokens")
+     * or greater than 20% numeric
+     */
     if (debug) println("Evaluating Line:")
     if (debug) println(line)
     if (in_textblock && detect_sentence_ending(line)) {
       // we are currently in a text block and this looks like the end of a sentence
       // we don't care how short it is, go ahead and keep it
-      // I added this huristic because, at least in the documents I tested, it seems that
+      // I added this heuristic because, at least in the documents I tested, it seems that
       // often a text block's last sentence will end with just a word or two on the last line.
-      // Without this rule the cleaner will discard the entire text block. 
-      if (debug) println("    Accepting line because it looks like the end of the sentence for the current textblock.")
+      // Without this rule the cleaner will discard the entire text block.
+      if (debug) println("    Accepting line because it looks like the end of the sentence for the current text block.")
       true
     } else if (tokens.size > 5) {
-      var alpha_percent = BigDecimal(countAlphaNum(tokens))/tokens.size
+      val alpha_percent = BigDecimal(countAlphaNum(tokens))/tokens.size
       if (alpha_percent > .65) {
-        var numeric_percent = BigDecimal(countNumeric(tokens))/tokens.size
+        val numeric_percent = BigDecimal(countNumeric(tokens))/tokens.size
         if (numeric_percent < .3) {
           if (debug) println("    Accepted line")
           true
         } else {
-          if (debug) println(s"    Rejected line: it did not have less than 20% numeric characters. Percent was ${numeric_percent}")
+          if (debug) println(s"    Rejected line: it did not have less than 20% numeric characters. Percent was $numeric_percent")
           false
         }
       } else {
-        if (debug) println(s"    Rejected line: it did not have more than 70% alpha numeric characters. Percent was ${alpha_percent}")
+        if (debug) println(s"    Rejected line: it did not have more than 65% alpha numeric characters. Percent was $alpha_percent")
         false
       }
     } else {
-      if (debug) println("    Rejected line: it did not have > 5 tokens") 
+      if (debug) println("    Rejected line: it did not have > 5 tokens")
       false
     }
   }
 
   def detect_sentence_ending(line: String): Boolean = {
-    var last = line.takeRight(1)
-    var penultimate = line.takeRight(2).take(1)
-    var antipenultimate = line.takeRight(3).take(1)
+    val last = line.takeRight(1)
+    val penultimate = line.takeRight(2).take(1)
+    //var antipenultimate = line.takeRight(3).take(1)
     if (last == "." || last == "?" || last == "!") {
       if (line.takeRight(3) == "..") {
         // We don't accept .. as the valid end of a sentence
@@ -510,7 +517,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
   // it has to have two tokens to rub together, and at
   // least one of them has to be alphanumeric.
   def keepMiddleLine(line: String): Boolean = {
-    var tokens = tokenize_line(line)
+    val tokens = tokenize_line(line)
     if (debug) println(s"   Number of tokens is ${tokens.length}")
     if (debug) println(s"   Alpha numeric tokens is ${countAlphaNum(tokens)}")
     if (tokens.length >= 2 && countAlphaNum(tokens) >= 1) {
@@ -526,19 +533,19 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     // See the API Usage Section of
     // https://nlp.stanford.edu/software/tokenizer.shtml
 
-	var hashes: ListBuffer[String] = new ListBuffer()
-    var builder = StringBuilder.newBuilder 
-    var textblock: ListBuffer[String] = ListBuffer()
+	  val hashes: ListBuffer[String] = new ListBuffer()
+    var builder = mutable.StringBuilder.newBuilder
+    val textblock: ListBuffer[String] = ListBuffer()
     var in_textblock: Boolean = false
     var last_dropped_line: Option[String] = None
     var potential_middle_line: Option[String] = None
 
     // a little helper function.
     // This is a bit subtle, if the last line that we dropped looks like it could be the start
-    // of a text block (i.e. it begins with a capital letter and the actual text block does not) 
-    // then throw it onto the front of the current textblock we are evaluating. Otherwise just 
+    // of a text block (i.e. it begins with a capital letter and the actual text block does not)
+    // then throw it onto the front of the current textblock we are evaluating. Otherwise just
     // include all of the non-dropped lines which are in the builder.
-    def buildTextBlock(last_dropped_line: Option[String], string_builder: StringBuilder): String = {
+    def buildTextBlock(last_dropped_line: Option[String], string_builder: mutable.StringBuilder): String = {
       //if (debug) println("Looking at:--"+string_builder.toString()+"--")
       if (last_dropped_line.isDefined && upper_pattern.matcher(last_dropped_line.get).find() && !upper_pattern.matcher(string_builder.toString()).find()) {
         if (debug) println("Including last dropped line")
@@ -568,10 +575,10 @@ class PrepareDocument(document: String) extends java.io.Serializable {
                                             // using the much slower Regexp split.
                                             // https://github.com/scala/scala/blob/2.8.x/src/library/scala/io/Source.scala
       // First see if we are keeping the line
-      if (keep_line(line, in_textblock)) {
+      if (keepLine(line, in_textblock)) {
         // Build the hash for the line, used later to detect highly duplicate document
         hashes += md5HashString(line)
-        if (builder.length == 0) {
+        if (builder.isEmpty) {
           builder.append(line)
           in_textblock = true
         } else {
@@ -586,18 +593,18 @@ class PrepareDocument(document: String) extends java.io.Serializable {
         }
 
         if (detect_sentence_ending(line)) {
-          // We found the end of a sentenc, write out the text block
+          // We found the end of a sentence, write out the text block
           // and start a new one
           if (debug) println("---Is sentence ending")
-          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
+          val cleaned: Option[String] = cleanTextBlock(buildTextBlock(last_dropped_line, builder))
           // the foreach will only run if there is a value in the option
-          // Bascially, the potential text block might not even have enough info
+          // Basically, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           cleaned.foreach(tb => appendToTextblock(textblock, tb))
-          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
-          if (debug) println("*** New Textblock ***")
-          builder = StringBuilder.newBuilder
+          if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
+          if (debug) println("*** New Text Block ***")
+          builder = mutable.StringBuilder.newBuilder
           in_textblock = false
           // Since we just processed a text block without dropping a line go ahead and clear
           // the last_dropped_line since we know it will not apply to the next text block
@@ -607,13 +614,13 @@ class PrepareDocument(document: String) extends java.io.Serializable {
       } else {
         // We may be dropping a line, if we do then the text block ends here, but under some circumstances we won't
         // be sure until the next line
-        if (builder.length > 0 && potential_middle_line.isDefined) {
+        if (builder.nonEmpty && potential_middle_line.isDefined) {
           // if there is anything in the buffer and we have already had one line that we thought about dropping
           // then we drop both lines and process the text block (last_dropped_line is a line that might belong on
           // the front of the text block, it has nothing to do with the interstitial line evaluation)
           if (debug) println("We dropped two lines, ending the text block, processing remaining text in the string builder")
           potential_middle_line = None
-          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
+          val cleaned: Option[String] = cleanTextBlock(buildTextBlock(last_dropped_line, builder))
           if (debug) {
             if (cleaned.isDefined) {
               println("Cleaner returned content, whatever remained in the string builder did not contain a complete sentence.")
@@ -622,27 +629,27 @@ class PrepareDocument(document: String) extends java.io.Serializable {
             }
           }
           // the foreach will only run if there is a value in the option
-          // Bascially, the potential text block might not even have enough info
+          // Basically, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           //cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
           cleaned.foreach(tb => appendToTextblock(textblock, tb))
-          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
-          if (debug) println("*** New Textblock ***")
-          builder = StringBuilder.newBuilder
+          if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
+          if (debug) println("*** New Text Block ***")
+          builder = mutable.StringBuilder.newBuilder
           in_textblock = false
-        } else if (builder.length > 0 && keepMiddleLine(line)) {
+        } else if (builder.nonEmpty && keepMiddleLine(line)) {
           // the line seems to be in the middle of two valid lines and it has
           // at least two tokens and some letters
           // Keep it and if the next line is valid we will include it and keep
           // trucking on the text block
           if (debug) println("  Keeping potential interstitial line")
           potential_middle_line = Some(line)
-        } else if (builder.length > 0) {
+        } else if (builder.nonEmpty) {
           // We will NOT be keeping this as a potential interstitial line (that case is caught in the previous condition)
           // so this is the end of the text block. Go ahead and build and clean it.
           if (debug) println("We have rejected a potential interstitial line, go ahead and build and clean the text block")
-          var cleaned: Option[String] = cleanTextblock(buildTextBlock(last_dropped_line, builder))
+          val cleaned: Option[String] = cleanTextBlock(buildTextBlock(last_dropped_line, builder))
           if (debug) {
             if (cleaned.isDefined) {
               println("Cleaner returned content, whatever remained in the string builder did not contain a complete sentence.")
@@ -655,18 +662,18 @@ class PrepareDocument(document: String) extends java.io.Serializable {
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           cleaned.foreach(tb => appendToTextblock(textblock, tb)) // the foreach will only run if there is a value
-          
+
           // Reset all the things
-          if (debug && !cleaned.isDefined) println("*** No valid sentences found in tetxblock, discarding")
+          if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
           if (debug) println("*** New Textblock ***")
-          builder = StringBuilder.newBuilder
+          builder = mutable.StringBuilder.newBuilder
           in_textblock = false
           potential_middle_line = None
         }
 
-        // We are dropping this line. Let's see if we might want to keep it as the start of the 
+        // We are dropping this line. Let's see if we might want to keep it as the start of the
         // next text block
-        if (!potential_middle_line.isDefined) {
+        if (potential_middle_line.isEmpty) {
           in_textblock = false
           if (upper_pattern.matcher(line).find()) {
             // Hmm, could be a short or complex sentence that is actually the start
@@ -681,18 +688,18 @@ class PrepareDocument(document: String) extends java.io.Serializable {
       }
     }
 
-    /* Catch any remaining content in the case of documents that do not end in a complete sentence or 
+    /* Catch any remaining content in the case of documents that do not end in a complete sentence or
      * a dropped line. Common in testing, kind of rare in the actual Common Crawl archive
      */
-    if (builder.length != 0) {
+    if (builder.nonEmpty) {
       if (debug) println("The document did not end on a complete sentence.")
       // run the cleaner
-      var cleaned: Option[String] = cleanTextblock(builder.toString())
+      val cleaned: Option[String] = cleanTextBlock(builder.toString())
       cleaned.foreach(tb => appendToTextblock(textblock, tb))
     }
 
 	if (debug) println(hashes)
-    var result_list: ListBuffer[String] = new ListBuffer[String]
+    val result_list: ListBuffer[String] = new ListBuffer[String]
     textblock.foreach { l => 
       result_list.append(l)
     }

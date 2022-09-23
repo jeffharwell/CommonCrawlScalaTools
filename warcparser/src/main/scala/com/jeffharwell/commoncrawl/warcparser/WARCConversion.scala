@@ -39,7 +39,8 @@ class WARCConversion(acategorizer: WARCTopicFilter) extends WARCRecord {
   // Wrap the WARCCategorizer, use the contents of the content field
   def hasCategories(): Boolean = {
     if (fields.contains("Content")) {
-      categorizer.hasCategories(fields("Content"))
+      //categorizer.hasCategories(fields("Content"), fields("WARC-Record-ID"))
+      categorizer.hasCategories(this)
     } else {
       false
     }
@@ -68,8 +69,8 @@ class WARCConversion(acategorizer: WARCTopicFilter) extends WARCRecord {
     // method works. Also makes it explicit when there is actually not categories
     // ,Option(None), vs the record doesn't match any categories, Option(Set())
     if (fields.contains("Content")) {
-      var categories: Set[String] = categorizer.getCategories(fields("Content"))
-      if (categories.size > 0) {
+      var categories: Set[String] = categorizer.getCategories(this)
+      if (categories.nonEmpty) {
         Some(categories)
       } else {
         None

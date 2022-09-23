@@ -15,7 +15,7 @@ trait WARCTopicFilter extends java.io.Serializable {
    *
    * @param s The string of content to categorize
    */
-  def hasCategories(s: String): Boolean
+  def hasCategories[A <: WARCRecord](w: A): Boolean
 
   /*
    * This method returns a set containing each category that the string s
@@ -23,5 +23,5 @@ trait WARCTopicFilter extends java.io.Serializable {
    *
    * @param s The string of content to categorize
    */
-  def getCategories(s: String): Set[String]
+  def getCategories[A <: WARCRecord](w: A): Set[String]
 }

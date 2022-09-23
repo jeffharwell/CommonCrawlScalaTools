@@ -1,13 +1,16 @@
 package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 
 import com.datastax.driver.core.ConsistencyLevel
-import com.datastax.spark.connector.cql.CassandraConnectorConf
+import com.datastax.spark.connector.cql.{CassandraConnector, CassandraConnectorConf}
 import com.datastax.spark.connector.toRDDFunctions
 import com.datastax.spark.connector.writer.WriteConf
-import com.jeffharwell.commoncrawl.warcparser.FourForumsWARCTopicFilter
+import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCStreamFilter, FourForumsWARCTopicFilter}
 import org.apache.spark.{SparkConf, SparkContext}
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import scala.collection.mutable.ListBuffer
+
 
 object parseWETFilesFromCommoncrawl {
   def main(args: Array[String]) {
@@ -63,13 +66,27 @@ object parseWETFilesFromCommoncrawl {
     var length = url.size
 
     var urls = {
-      if (length <= 27) {
-        sc.parallelize(url)
+      if (length <= 11) {
+        sc.parallelize(url, 2)
       } else {
         // We want about 3 WET Archive files per partition
         sc.parallelize(url, length / 3)
       }
     }
+
+    // Instantiate the Stream Filter this pipeline run
+    println("\n\n>> Configuring FourForumnsWARCStreamFilter as a stream filter.")
+    val stream_filter = new FourForumsWARCStreamFilter()
+    stream_filter.setMinMentions(1)
+
+    // Instantiate the Topic Filter for this pipeline run
+    println("\n\n>> Configuring FourForumnsWARCTopicFilter as topic filter.")
+    val topic_filter: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter()
+    println("\n\n>> Configuring Thresholds for topic filter")
+    topic_filter.setMentions("abortion", Map("core" -> 1, "secondary" -> 1))
+    topic_filter.setMentions("evolution", Map("core" -> 1, "secondary" -> 2))
+    topic_filter.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 1))
+    topic_filter.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 1))
 
     // Be CAREFUL! The SparkContext (the sc) can never touch the RDD in any way or you will get a very difficult to
     // troubleshoot NPE. This means that if you put the sc in any function that gets passed to the workers, or inside
@@ -82,21 +99,39 @@ object parseWETFilesFromCommoncrawl {
     // So the ProcessWETPaths object is going to be serialized and sent out to each worker so that it can
     // process each url in its partition. So ProcessWETPaths must be serializable and can't depend directly on
     // the spark context.
-    println("\n\n>> Configuring FourForumnsWARCTopicFilter as topic filter.")
-    val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter()
-    println("\n\n>> Configuring Thresholds for topic filter")
-    ffc.setMentions("abortion", Map("core" -> 1, "secondary" -> 1))
-    ffc.setMentions("evolution", Map("core" -> 1, "secondary" -> 2))
-    ffc.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 1))
-    ffc.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 1))
-
     val cassandraconf = CassandraConnectorConf(sc.getConf)
-    val dcc = new ProcessWETPaths(cc_url, sc.getConf)
-    val parsed_records = urls.map(x => dcc.parseWETArchiveURL(x, cassandraconf, ffc))
+    val processor = new ProcessWETPaths(cc_url, sc.getConf)
+    val parsed_records = urls.map(x => processor.parseWETArchiveURL(x, cassandraconf, topic_filter, stream_filter))
 
     // Now do it, parse the records
     //parsed_records.flatMap(identity).saveToCassandra("pilotparse", "wetrecord", writeConf = ignoreNullsWriteConf)
+    val parse_start_time = System.nanoTime()
     parsed_records.flatMap(identity).saveToCassandra("pilotparse", "wetrecord")
+    val parse_end_time = System.nanoTime()
+    val elapsed = parse_end_time - parse_start_time
+    print(s"URLs processed: ${urls.count()}")
+    print(s"Elapsed time for processing: ${elapsed} ns")
+
+    val uuid = java.util.UUID.randomUUID.toString
+    val formatter = DateTimeFormatter.ofPattern("uuuu/MM/dd HH:mm:ss");
+    val timestamp = formatter.format(LocalDateTime.now())
+    val number_of_urls = urls.count().toString
+    val process_name = "parseWETFilesFromCommoncrawl"
+
+    print(s"Writing processing run stats to pilotparse.wetrecord_processing_stats")
+    val cc = new CassandraConnector(cassandraconf)
+    cc.withSessionDo { session =>
+      /* Schema
+      CREATE TABLE pilotparse.wetrecord_processing_stats (
+          row_uuid text PRIMARY KEY,
+          process_name text,
+          number_of_urls text,
+          processing_time_ns bigint,
+          processing_date text
+      )
+      */
+      session.execute(s"insert into pilotparse.wetrecord_processing_stats (row_uuid, process_name, number_of_urls, processing_time_ns, processing_date) values ('${uuid}', '${process_name}', '${number_of_urls}', ${elapsed}, '${timestamp}')")
+    }
 
     print("\n\n>>>>>> END OF PROGRAM <<<<<<\n\n");
   }

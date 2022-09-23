@@ -3,13 +3,15 @@ package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 import com.datastax.spark.connector.types.CassandraOption
 import com.datastax.spark.connector.writer._
 import com.datastax.driver.core.ConsistencyLevel
-import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Parser, ParserTooSlowException, WARCTopicFilter, WARCRecord}
+import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, Parser, ParserTooSlowException, WARCRecord, WARCStreamFilter, WARCTopicFilter}
 import org.apache.spark.SparkConf
 
 import java.io.BufferedInputStream
 import java.net.URL
 import java.time.Instant
+import javax.net.ssl.HttpsURLConnection
 import scala.collection.mutable.ListBuffer
+import scala.util.Random
 
 class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends java.io.Serializable {
   // Stores the URL where we are accessing Common Crawl from AWS
@@ -53,12 +55,8 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
    */
 
   // Define our function to parse a given WET archive path
-  def parseWETArchiveURL[A <: WARCTopicFilter](wet_path: String, cassandraConnectorConf: com.datastax.spark.connector.cql.CassandraConnectorConf, warcCategorizer: A, retries: Integer = 0): List[WARCCassandraBindWithCategories] = {
+  def parseWETArchiveURL[A <: WARCTopicFilter, B <: WARCStreamFilter](wet_path: String, cassandraConnectorConf: com.datastax.spark.connector.cql.CassandraConnectorConf, topicFilter: A, streamFilter: B, retries: Integer = 0): List[WARCCassandraBindWithCategories] = {
     val url = new URL(s"$commoncrawl_aws_url$wet_path")
-
-    // Create the categorizer
-    //val c: FourForumsWARCCategorizer = new FourForumsWARCCategorizer(1, 2)
-    val c = warcCategorizer
 
     // Create the start and finish triggers
     val myStartTrigger = new MyStartTrigger(cassandraConnectorConf, wet_path)
@@ -66,6 +64,10 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
 
     // Parse the records and load the list buffer
     val records = ListBuffer[WARCRecord]()
+
+    // We don't want a bunch of processes launched in parallel hitting S3 at the exact same time
+    // so stagger the start time few seconds (between 0 and 10 seconds)
+    Thread.sleep(Random.nextInt(10000))
 
     // Note when we started
     val start_seconds = Instant.now().getEpochSecond
@@ -83,9 +85,10 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
       val urlconnection = url.openConnection()
       urlconnection.setReadTimeout(60000)
       urlconnection.setConnectTimeout(60000)
+
       println(s"   Opening connection to $commoncrawl_aws_url$wet_path")
 
-      val parser_from_aws = Parser(new BufferedInputStream(urlconnection.getInputStream), c)
+      val parser_from_aws = Parser(new BufferedInputStream(urlconnection.getInputStream), topicFilter)
       parser_from_aws.addStartTrigger(myStartTrigger)
       parser_from_aws.addFinishTrigger(myFinishTrigger)
       // Set up the rate limit, see comments above.
@@ -94,9 +97,7 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
       //parser_from_aws.setDebugMemory() // Turn on Memory usage messages from the parser
 
       // Do the parse with the filter
-      //parser_from_aws.withFilter(myfilter(_)).foreach((wc: WARCRecord) => records += wc)
-      parser_from_aws.foreach((wc: WARCRecord) => records += wc)
-
+      parser_from_aws.withFilter(streamFilter(_)).foreach((wc: WARCRecord) => records += wc)
 
       // Note when we finished and log it
       println(s">> Finished Parsing $wet_path at ${Instant.now()}")
@@ -105,18 +106,19 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
       val rate = records.size.toDouble / (finish_seconds - start_seconds)
       println(s"   Filter extraction rate was $rate records / sec")
 
-      Thread.sleep(30000) // don't hit AWS so hard, pause for 30 seconds before the next record
+      // don't hit AWS so hard, pause for between 20 and 40 seconds before the next record
+      Thread.sleep(20000 + Random.nextInt(20000))
     } catch {
       case error: java.net.SocketException =>
         if (retries < 0) { // once we fail twice we never seem to succeed, so only try once or twice with a significant back off, specifically 5? minutes (1+2+3+4+5)
-          val retry_seconds = 60000
+          val retry_ms = 60000
           println(s">> Parsing $wet_path Failed at ${Instant.now()}")
           println(s"   $error")
-          println(s"   Connection Error, the socket reset, sleeping for ${retry_seconds * (retries + 1)} ms before retrying")
+          println(s"   Connection Error, the socket reset, sleeping for ${retry_ms * (retries + 1)} ms before retrying")
           val finish_seconds = Instant.now().getEpochSecond
           println(s"   $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
-          Thread.sleep(retry_seconds * (retries + 1))
-          parseWETArchiveURL(wet_path, cassandraConnectorConf, c, retries + 1)
+          Thread.sleep(retry_ms * (retries + 1))
+          parseWETArchiveURL(wet_path, cassandraConnectorConf, topicFilter, streamFilter, retries + 1)
         } else {
           val finish_seconds = Instant.now().getEpochSecond
           println(s"   Connection Error, the socket reset and we have failed $retries times, erroring out.")
@@ -127,16 +129,16 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
           println(s">> Parsing $wet_path Failed at ${Instant.now()}")
         }
       case error: java.net.UnknownHostException => // this is thrown if the new URL() command can't resolve the hostname
-        if (retries < 15) { // we are much more likely to recover from this then the socket reset error, and if we fail at this point there are no partial records.
+        if (retries < 10) { // we are much more likely to recover from this then the socket reset error, and if we fail at this point there are no partial records.
           // So try harder.
-          val retry_seconds = 5000
+          val retry_ms = 10000
           val finish_seconds = Instant.now().getEpochSecond
           println(s"   $error")
-          println(s"   Could not open the URL, unknown host name (what the heck causes that!!), sleeping for ${retry_seconds * (retries + 1)} ms before retrying")
+          println(s"   Could not open the URL, unknown host name (what the heck causes that!!), sleeping for ${retry_ms * (retries + 1)} ms before retrying")
           println(s"   $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
           println(s">> Parsing $wet_path Failed at ${Instant.now()}")
-          Thread.sleep(retry_seconds * (retries + 1))
-          parseWETArchiveURL(wet_path, cassandraConnectorConf, c, retries + 1)
+          Thread.sleep(retry_ms * (retries + 1))
+          parseWETArchiveURL(wet_path, cassandraConnectorConf, topicFilter, streamFilter, retries + 1)
         } else {
           val finish_seconds = Instant.now().getEpochSecond
           println(s"  Connection Error: failed $retries times to resolve $commoncrawl_aws_url$wet_path.")
@@ -155,7 +157,7 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
           val finish_seconds = Instant.now().getEpochSecond
           println(s"   $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
           Thread.sleep(retry_seconds * (retries + 1))
-          parseWETArchiveURL(wet_path, cassandraConnectorConf, c, retries + 1)
+          parseWETArchiveURL(wet_path, cassandraConnectorConf, topicFilter, streamFilter, retries + 1)
         } else {
           val finish_seconds = Instant.now().getEpochSecond
           println(s"   Error Message: $error")
@@ -164,6 +166,28 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
           println(s"   This WARC file will not be marked complete in the database and may be sampled again later.")
           println(s"   $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
           println(s">> FAILED: Parsing $wet_path Failed at ${Instant.now()}")
+        }
+      case error: java.io.IOException =>
+        if (retries < 8) {
+          // We are much more likely to recover from this then the socket reset error.
+          // In particular this catch the HTTP 503 error, indicating that S3 isn't ready to process
+          // our request. Fallback in that case should be effective.
+          val retry_ms = 10000
+          val finish_seconds = Instant.now().getEpochSecond
+          println(s"   $error")
+          println(s"   Could not open the URL, sleeping for ${retry_ms * (retries + 1)} ms before retrying")
+          println(s"   $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
+          println(s">> Parsing $wet_path Failed at ${Instant.now()}")
+          Thread.sleep(retry_ms * (retries + 1))
+          parseWETArchiveURL(wet_path, cassandraConnectorConf, topicFilter, streamFilter, retries + 1)
+        } else {
+          val finish_seconds = Instant.now().getEpochSecond
+          println(s"  Connection Error: failed $retries times to resolve $commoncrawl_aws_url$wet_path.")
+          println(s"   $error")
+          println(s"  We collected ${records.size} records.")
+          println(s"  This WARC file will not be marked complete in the database and may be sampled again later.")
+          println(s"  $wet_path Elapsed time = ${finish_seconds - start_seconds} seconds")
+          println(s">> Parsing $wet_path Failed at ${Instant.now()}")
         }
     }
     //records.map(x => writeByCategory(x, wet_path)).toList

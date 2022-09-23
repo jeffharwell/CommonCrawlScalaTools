@@ -33,13 +33,24 @@ class MyWARCTopicFilter(minimummentions: Int) extends WARCTopicFilter {
   )
 
   /*
-   * Returns a boolean if the string s matches any categories.
-   *
-   * @param s The string to categorize
-   */
-  def hasCategories(s: String): Boolean = {
-    var categories = categorizeString(s, minimummentions, keywords)
-    if (categories.size > 0) {
+  * Accepts the WARC Record, unwraps the Option(w.getContent())
+  * and runs hasCategoriesOption on the content if it exists.
+  */
+  def hasCategories[A <: WARCRecord](w: A): Boolean = {
+    w.getContent() match {
+      case Some(s) => stringHasCategories(s)
+      case None => false
+    }
+  }
+
+  /*
+ * Returns a boolean if the string s matches any categories.
+ *
+ * @param s The string to categorize
+ */
+  def stringHasCategories(s: String): Boolean = {
+    val categories = categorizeString(s, minimummentions, keywords)
+    if (categories.nonEmpty) {
       true
     } else {
       false
@@ -51,8 +62,11 @@ class MyWARCTopicFilter(minimummentions: Int) extends WARCTopicFilter {
    *
    * @param s The string to categorize
    */
-  def getCategories(s: String): Set[String] = {
-    categorizeString(s, minimummentions, keywords).toSet
+  def getCategories[A <: WARCRecord](w: A): Set[String] = {
+    w.getContent() match {
+      case Some(s) => categorizeString(s, minimummentions, keywords).toSet
+      case None => List[String]().toSet
+    }
   }
 
   // Getter for Minimum Mentions

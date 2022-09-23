@@ -6,6 +6,39 @@ import com.jeffharwell.commoncrawl.warcparser.MyWARCTopicFilter
 
 class MyWARCTopicFilterSpec extends FlatSpec {
 
+  // Default warcinfo type required fields and values
+  val warcinforequired: Map[String, String] = Map[String,String](
+    "WARC-Type" -> "warcinfo"
+    ,"WARC-Date" -> "2016-12-13T03:22:59Z"
+    ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
+    ,"WARC-Record-ID" -> "<urn:uuid:600aac89-8012-4390-8be6-2d81979f88cc>"
+    ,"Content-Type" -> "application/warc-fields"
+    ,"Content-Length" -> "259")
+
+  def create_warc_record(content: String): WARCConversion = {
+    // First create the WARCInfo we need
+    val winfo = new WARCInfo()
+    winfo.addFields(warcinforequired)
+    winfo.addContent("This is my content")
+
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String, String] = Map[String, String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> s"${content.length}")
+
+    w.addFields(requiredfields)
+    w.addContent(content)
+    w.addWARCInfo(winfo)
+    w
+  }
+
  /*
  * Unit Tests
  */
@@ -13,21 +46,26 @@ class MyWARCTopicFilterSpec extends FlatSpec {
   "MyWARCTopicFilter" should "assign a topic to a paragraph that only mentions the keyword once with minmentions = 1" in
   {
     val c = new MyWARCTopicFilter(1)
-    assert(c.getCategories(testcontent1).size > 0)
+    val w = create_warc_record(testcontent1)
+    //assert(c.getCategories(testcontent1).nonEmpty)
+    assert(c.getCategories(w).nonEmpty)
 
   }
 
   "MyWARCTopicFilter" should "assign the topic asthma to testcontent1 minmentions = 1" in
   {
     val c = new MyWARCTopicFilter(1)
-    assert(c.getCategories(testcontent1) == Set("asthma"))
+    val w = create_warc_record(testcontent1)
+    //assert(c.getCategories(testcontent1) == Set("asthma"))
+    assert(c.getCategories(w) == Set("asthma"))
   }
 
 
   "MyWARCTopicFilter" should "not assign a topic to a paragraph that only mentions the keyword once with minmentions = 2" in
   {
     val c = new MyWARCTopicFilter(2)
-    assert(!c.hasCategories(testcontent1))
+    assert(!c.hasCategories(create_warc_record(testcontent1)))
+    //assert(!c.hasCategories(testcontent1))
   }
 
 /*

@@ -27,6 +27,36 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
 
   type KeywordStruc = Map[String, List[String]]
   type LookupStruc = Map[Char, List[(String, String, String)]]
+  //var stats_writer: Option[A <: StatsWriterTopicFilterStatsWriter] = None
+  var stats_writer: Option[StatsWriter] = None
+  var stats = false
+
+  // We are going to be collecting stats and saving them to Cassandra
+  // Add the stats writer to the object.
+  def setStatsWriter[A <: StatsWriter](writer: A): Unit = {
+    if (!stats) {
+      stats = true
+      stats_writer = Some(writer)
+    }
+  }
+
+  def writeStats(warc_record: WARCRecord, measurement_type: String, measurement: Long): Unit = {
+    // If we have a stats_writer defined, then write the statistic we have been passed
+    // otherwise do nothing.
+    stats_writer match {
+      case Some(w: StatsWriter) => w(warc_record, measurement_type, measurement)
+      case _ => None
+    }
+  }
+
+  def writeStatsCompact(warc_record: WARCRecord, categories: String, processing_time: Long): Unit = {
+    // If we have a stats_writer defined, then write the statistic we have been passed
+    // otherwise do nothing.
+    stats_writer match {
+      case Some(w: StatsWriter) => w(warc_record, categories, processing_time)
+      case _ => None
+    }
+  }
 
  /*
   * This function takes our keywords and creates a lookup structure that is then used
@@ -184,14 +214,13 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
       m
     }).toMap
   }
+
   /*
-   * Returns a boolean if the string s matches any categories.
-   *
-   * @param s The string to categorize
-   */
-  def hasCategories(s: String): Boolean = {
-    val categories = categorizeString(s)
-    if (categories.size > 0) {
+* Accepts the WARC Record, unwraps the Option(w.getContent())
+* and runs hasCategoriesOption on the content if it exists.
+*/
+  def hasCategories[A <: WARCRecord](w: A): Boolean = {
+    if (getCategories(w).nonEmpty) {
       true
     } else {
       false
@@ -203,8 +232,32 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
    *
    * @param s The string to categorize
    */
-  def getCategories(s: String): Set[String] = {
-    categorizeString(s)
+  def getCategories[A <: WARCRecord](w: A): Set[String] = {
+    w.getContent() match {
+      case Some(s) =>
+        val start_time = System.nanoTime()
+        val categories = categorizeString(s)
+        val end_time = System.nanoTime()
+        //writeStats(w, "categorization time", end_time - start_time)
+        if (categories.nonEmpty) {
+          val category_list: Set[String] = for {
+                                                  c <- categories
+                                               } yield(c)
+          val categories_str: String = category_list.toList.mkString(",")
+          //categories.foreach(c => writeStats(w, s"category $c", 1))
+          //writeStats(w, "assigned a category", 1)
+          writeStatsCompact(w, categories_str, end_time - start_time)
+        } else {
+          //writeStats(w, "assigned a category", 0)
+          writeStatsCompact(w, "", end_time - start_time)
+        }
+        categories
+      case None =>
+        //writeStats(w, "categorization time", 0)
+        //writeStats(w, "assigned a category", 0)
+        writeStatsCompact(w,"", 0)
+        List[String]().toSet
+    }
   }
 
   /*

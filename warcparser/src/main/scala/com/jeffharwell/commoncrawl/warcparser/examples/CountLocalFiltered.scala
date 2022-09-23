@@ -161,7 +161,7 @@ object CountLocalFiltered {
         println(s"Contains any of the filter keywords: ${myfilter(r)}")
         print("Document matches the following categories: ")
         r.getContent() match {
-          case Some(content) => println(c.getCategories(content))
+          case Some(content) => println(c.getCategories(r))
           case _ => println("None")
         }
       })

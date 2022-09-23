@@ -10,11 +10,12 @@
 # Note that CreateCorpus-assembly-${VERSION}.jar file is a "fat jar" created
 #  by running 'sbt assembly'
 
+#SPARK_HOME=${HOME}/bin/spark/spark-1.6.3-bin-hadoop2.6/
 SPARK_HOME=${HOME}/bin/spark/spark-2.3.2-bin-hadoop2.7/
+#SPARK_CLUSTER="spark://k8master.fuller.edu:7077"
 SPARK_CLUSTER="spark://k8v17master.fuller.edu:6066"
-CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.parseWETFilesFromCommoncrawl"
+CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.populateRandomWETPathsWARCIDs"
 VERSION=`cat ./build.sbt | grep ^version | awk '{print $3}' | sed 's/"//g'`
-NUMBER_OF_WET_PATHS_TO_SELECT=111
 
 ###
 #
@@ -45,10 +46,16 @@ NUMBER_OF_WET_PATHS_TO_SELECT=111
 # the headless service and the one member spark-worker-driver app
 #
 
+#$SPARK_HOME/bin/spark-submit \
+#    --verbose --deploy-mode cluster \
+#    --class ${CLASS_TO_CALL} \
+#    --master ${SPARK_CLUSTER} \
+#    --driver-class-path /opt/spark/lib/spark-assembly-1.6.3-hadoop2.6.0.jar \
+#    http://nginx/CreateCorpus-assembly-${VERSION}.jar
 $SPARK_HOME/bin/spark-submit \
     --verbose --deploy-mode cluster \
     --class ${CLASS_TO_CALL} \
     --master ${SPARK_CLUSTER} \
     --executor-memory 2G \
-    --total-executor-cores 7\
-    http://nginx/CreateCorpus-assembly-${VERSION}.jar ${NUMBER_OF_WET_PATHS_TO_SELECT}
+    --total-executor-cores 4\
+    http://nginx/CreateCorpus-assembly-${VERSION}.jar

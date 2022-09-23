@@ -1,5 +1,12 @@
 CREATE KEYSPACE pilotparse WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'}  AND durable_writes = true;
 
+CREATE TABLE pilotparse.stream_filter_stats (
+    warc_record_id text,
+    measurement_type text,
+    measurement bigint,
+    PRIMARY KEY (warc_record_id, measurement_type)
+) WITH compaction = {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy'};
+
 CREATE TABLE pilotparse.random_wetpaths (
     wet_path text PRIMARY KEY
 );

@@ -1,7 +1,40 @@
 import org.scalatest._
-import com.jeffharwell.commoncrawl.warcparser.FourForumsWARCTopicFilter
+import com.jeffharwell.commoncrawl.warcparser.{FourForumsWARCTopicFilter, WARCConversion, WARCInfo}
 
 class FourForumsWARCTopicFilterSpec extends FlatSpec {
+
+  // Default warcinfo type required fields and values
+  val warcinforequired: Map[String, String] = Map[String,String](
+    "WARC-Type" -> "warcinfo"
+    ,"WARC-Date" -> "2016-12-13T03:22:59Z"
+    ,"WARC-Filename" -> "CC-MAIN-20161202170900-00009-ip-10-31-129-80.ec2.internal.warc.wet.gz"
+    ,"WARC-Record-ID" -> "<urn:uuid:600aac89-8012-4390-8be6-2d81979f88cc>"
+    ,"Content-Type" -> "application/warc-fields"
+    ,"Content-Length" -> "259")
+
+  def create_warc_record(content: String): WARCConversion = {
+    // First create the WARCInfo we need
+    val winfo = new WARCInfo()
+    winfo.addFields(warcinforequired)
+    winfo.addContent("This is my content")
+
+    val w: WARCConversion = WARCConversion()
+
+    val requiredfields: Map[String, String] = Map[String, String](
+      "WARC-Type" -> "conversion",
+      "WARC-Target-URI" -> "my uri",
+      "WARC-Date" -> "2016-12-13T03:22:59Z",
+      "WARC-Record-ID" -> "<urn:uuid:519aac89-8012-4390-8be6-2d81979f88cb>",
+      "WARC-Refers-To" -> "my refers to",
+      "WARC-Block-Digest" -> "my block digest",
+      "Content-Type" -> "my content type",
+      "Content-Length" -> s"${content.length}")
+
+    w.addFields(requiredfields)
+    w.addContent(content)
+    w.addWARCInfo(winfo)
+    w
+  }
 
   /*
  * Unit Tests
@@ -30,49 +63,64 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
 
   "FourForumsWARCTopicFilter" should "not categorize a paragraph that only contains core keywords" in {
     val c = new FourForumsWARCTopicFilter()
-    assert(!c.hasCategories(testcontext1_1))
+    val w = create_warc_record(testcontext1_1)
+    //assert(!c.hasCategories(testcontext1_1))
+    assert(!c.hasCategories(w))
   }
 
   "FourForumsWARCTopicFilter" should "categorize testcontext1 with two core keywords and one secondary words" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 2, "secondary" -> 1))
-    assert(c.hasCategories(testcontext1))
+    val w = create_warc_record(testcontext1)
+    //assert(c.hasCategories(testcontext1))
+    assert(c.hasCategories(w))
   }
 
   "FourForumsWARCTopicFilter" should "categorize testcontext2 with two core keywords and three secondary keywords" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 2, "secondary" -> 3))
-    assert(c.getCategories(testcontext2).nonEmpty)
+    //assert(c.getCategories(testcontext2).nonEmpty)
+    assert(c.getCategories(create_warc_record(testcontext2)).nonEmpty)
   }
 
   "FourForumsWARCTopicFilter" should "not categorize a paragraph that only contains two core keyword with minmentions = 3" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 3, "secondary" -> 2))
-    assert(!c.hasCategories(testcontext2))
+    val w = create_warc_record(testcontext2)
+    //assert(!c.hasCategories(testcontext2))
+    assert(!c.hasCategories(w))
   }
 
   "FourForumsWARCTopicFilter" should "categorize this paragraph as guncontrol" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 1))
-    assert(c.getCategories(testcontext2) == Set("guncontrol"))
+    val w = create_warc_record(testcontext2)
+    //assert(c.getCategories(testcontext2) == Set("guncontrol"))
+    assert(c.getCategories(w) == Set("guncontrol"))
   }
 
   "FourForumsWARCTopicFilter" should "categorize this paragraph as existenceofgod with one core keyword and one secondary keyword" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 1))
-    assert(c.getCategories(testcontext6) == Set("existenceofgod"))
+    val w = create_warc_record(testcontext6)
+    //assert(c.getCategories(testcontext6) == Set("existenceofgod"))
+    assert(c.getCategories(w) == Set("existenceofgod"))
   }
 
   "FourForumsWARCTopicFilter" should "not categorize this paragraph as existenceofgod with two core keyword and one secondary keyword" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 2, "secondary" -> 1))
-    assert(c.getCategories(testcontext6).isEmpty)
+    val w = create_warc_record(testcontext6)
+    //assert(c.getCategories(testcontext6).isEmpty)
+    assert(c.getCategories(w).isEmpty)
   }
 
   "FourForumsWARCTopicFilter" should "not categorize this paragraph as existenceofgod with one core keyword and four secondary keyword" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 4))
-    assert(c.getCategories(testcontext6).isEmpty)
+    val w = create_warc_record(testcontext6)
+    //assert(c.getCategories(testcontext6).isEmpty)
+    assert(c.getCategories(w).isEmpty)
   }
 
   "FourForumsWARCTopicFilter" should "count one core keyword and three secondary keyword in test string 6 for the existenceofgod category" in {
@@ -82,7 +130,9 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("existenceofgod")._1 == 1)
     assert(result_tuple._2("existenceofgod")._2 == 3)
-    assert(c.getCategories(testcontext6) != Set("existenceofgod"))
+    val w = create_warc_record(testcontext6)
+    //assert(c.getCategories(testcontext6) != Set("existenceofgod"))
+    assert(c.getCategories(w) != Set("existenceofgod"))
   }
 
   /*
