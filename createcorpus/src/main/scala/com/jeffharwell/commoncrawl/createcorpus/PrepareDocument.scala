@@ -535,7 +535,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
 
 	  val hashes: ListBuffer[String] = new ListBuffer()
     var builder = mutable.StringBuilder.newBuilder
-    val textblock: ListBuffer[String] = ListBuffer()
+    val textblocks: ListBuffer[String] = ListBuffer()
     var in_textblock: Boolean = false
     var last_dropped_line: Option[String] = None
     var potential_middle_line: Option[String] = None
@@ -601,7 +601,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
           // Basically, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
-          cleaned.foreach(tb => appendToTextblock(textblock, tb))
+          cleaned.foreach(tb => appendToTextblock(textblocks, tb))
           if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
           if (debug) println("*** New Text Block ***")
           builder = mutable.StringBuilder.newBuilder
@@ -633,7 +633,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
           //cleaned.foreach(tb => textblock.append(tb)) // the foreach will only run if there is a value
-          cleaned.foreach(tb => appendToTextblock(textblock, tb))
+          cleaned.foreach(tb => appendToTextblock(textblocks, tb))
           if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
           if (debug) println("*** New Text Block ***")
           builder = mutable.StringBuilder.newBuilder
@@ -661,7 +661,7 @@ class PrepareDocument(document: String) extends java.io.Serializable {
           // Bascially, the potential text block might not even have enough info
           // in it to keep it, the cleaner might basically delete all the content.
           // https://danielwestheide.com/blog/2012/12/19/the-neophytes-guide-to-scala-part-5-the-option-type.html
-          cleaned.foreach(tb => appendToTextblock(textblock, tb)) // the foreach will only run if there is a value
+          cleaned.foreach(tb => appendToTextblock(textblocks, tb)) // the foreach will only run if there is a value
 
           // Reset all the things
           if (debug && cleaned.isEmpty) println("*** No valid sentences found in text block, discarding")
@@ -695,12 +695,12 @@ class PrepareDocument(document: String) extends java.io.Serializable {
       if (debug) println("The document did not end on a complete sentence.")
       // run the cleaner
       val cleaned: Option[String] = cleanTextBlock(builder.toString())
-      cleaned.foreach(tb => appendToTextblock(textblock, tb))
+      cleaned.foreach(tb => appendToTextblock(textblocks, tb))
     }
 
 	if (debug) println(hashes)
     val result_list: ListBuffer[String] = new ListBuffer[String]
-    textblock.foreach { l => 
+    textblocks.foreach { l =>
       result_list.append(l)
     }
     result_list.mkString("\n")

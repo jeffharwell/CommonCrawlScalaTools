@@ -23,6 +23,8 @@ logBuffered in Test := false
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.2" % "provided"
 // libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.2"
 libraryDependencies += "org.apache.spark" %% "spark-core" % "2.3.2" % "provided"
+// Spark mllib required for Near Duplicate Detection (DetectNearDuplicates class)
+libraryDependencies += "org.apache.spark" %% "spark-mllib" % "2.4.8" % "provided"
 
 // The WARCParser Library
 libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.34"
