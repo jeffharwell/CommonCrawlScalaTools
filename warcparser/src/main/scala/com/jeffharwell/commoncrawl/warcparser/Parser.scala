@@ -105,7 +105,7 @@ class Parser[A <: WARCTopicFilter](inputstream: InputStream, categorizer: A, ste
   var debugMemory = false
 
   // Initialize our reader
-  val reader = new Reader(inputstream)
+  val reader = new Reader(inputstream, 10240)
 
   /*
    * Functions for dealing with the parse rate

@@ -120,8 +120,14 @@ object parseWETFilesFromCommoncrawl {
 
       // Now do it, parse the records
       //parsed_records.flatMap(identity).saveToCassandra("pilotparse", "wetrecord", writeConf = ignoreNullsWriteConf)
+
+      // We need to ignore any nulls, we are never inserting old data so we don't need to overwrite,
+      // and we don't want to insert tombstones by inserting null values, as this causes problems with
+      // performance that require compaction, which causes problems with disk space.
+      // https://github.com/datastax/spark-cassandra-connector/blob/master/doc/5_saving.md
+      val ignoreNullsWriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true)
       val parse_start_time = System.nanoTime()
-      parsed_records.flatMap(identity).saveToCassandra("pilotparse", "wetrecord")
+      parsed_records.flatMap(identity).saveToCassandra("pilotparse", "wetrecord", writeConf = ignoreNullsWriteConf)
       val parse_end_time = System.nanoTime()
       val elapsed = parse_end_time - parse_start_time
       print(s"URLs processed: ${urls.count()}")

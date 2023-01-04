@@ -20,5 +20,5 @@ $SPARK_HOME/bin/spark-submit \
     --class ${CLASS_TO_CALL} \
     --master ${SPARK_CLUSTER} \
     --executor-memory 2G \
-    --total-executor-cores 6\
+    --total-executor-cores 5\
     http://nginx/CreateCorpus-assembly-${VERSION}.jar

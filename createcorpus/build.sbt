@@ -27,7 +27,7 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "2.3.2" % "provided"
 libraryDependencies += "org.apache.spark" %% "spark-mllib" % "2.4.8" % "provided"
 
 // The WARCParser Library
-libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.34"
+libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.37"
 libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "2.3.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-parser" % "3.9.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.2"

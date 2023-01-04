@@ -12,7 +12,7 @@
 
 SPARK_HOME=${HOME}/bin/spark/spark-2.3.2-bin-hadoop2.7/
 SPARK_CLUSTER="spark://k8v17master.fuller.edu:6066"
-CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.reportOnCommonCrawlParseProgress"
+CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.reportOnDocumentsParsedByCategoryUsingIndex"
 VERSION=`cat ./build.sbt | grep ^version | awk '{print $3}' | sed 's/"//g'`
 
 $SPARK_HOME/bin/spark-submit \
@@ -20,5 +20,5 @@ $SPARK_HOME/bin/spark-submit \
     --class ${CLASS_TO_CALL} \
     --master ${SPARK_CLUSTER} \
     --executor-memory 2G \
-    --total-executor-cores 9\
+    --total-executor-cores 5\
     http://nginx/CreateCorpus-assembly-${VERSION}.jar

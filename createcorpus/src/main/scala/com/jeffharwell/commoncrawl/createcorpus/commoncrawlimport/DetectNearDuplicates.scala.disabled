@@ -1,5 +1,6 @@
 package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 
+import org.apache.spark
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql
 import org.apache.spark.sql.catalyst.dsl.expressions.{DslExpression, StringToAttributeConversionHelper}
@@ -58,9 +59,10 @@ import com.datastax.spark.connector.cql.CassandraConnectorConf
 case class FeatureSpaceBind(feature_index: Int, feature_value: Int)
 
 class DetectNearDuplicates(sc_arg: SparkContext) {
-  import org.apache.spark.implicits._
+  // import org.apache.spark.implicits._
 
   val sc: SparkContext = sc_arg
+  val spark = sc.Session
 
   val ignoreNullsWriteConf: WriteConf = WriteConf.fromSparkConf(sc.getConf).copy(ignoreNulls = true, consistencyLevel = ConsistencyLevel.ONE)
 

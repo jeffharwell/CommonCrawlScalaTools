@@ -2,6 +2,7 @@ package com.jeffharwell.commoncrawl.warcparser
 
 import scala.collection.mutable.{Map => MMap}
 import scala.collection.mutable.ListBuffer
+import scala.util.matching.Regex
 
 /*
  * Jeff's Internet Argument Corpus 2.0 FourForum WARC Topic Filter
@@ -30,6 +31,24 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
   //var stats_writer: Option[A <: StatsWriterTopicFilterStatsWriter] = None
   var stats_writer: Option[StatsWriter] = None
   var stats = false
+
+  // Use this pattern to determine if a core or secondary keyword
+  // is completely a subword or not
+  val token_separator_pattern: Regex = raw"[\s\p{Punct}-]".r
+  var require_token_separator: Boolean = false
+
+  // Changes the behavior of the matcher. By default it will not require a whitespace
+  // or punctuation either before or after a matching string, but setting this to true
+  // will make the class check to see
+  def setRequireTokenSeparator(value: Boolean): Unit = {
+    require_token_separator = value
+  }
+
+  // True if the object is requiring that the proceeding or following character be either
+  // punctuation or whitespace, false otherwise.
+  def getRequireTokenSeparator(): Boolean = {
+    require_token_separator
+  }
 
   // We are going to be collecting stats and saving them to Cassandra
   // Add the stats writer to the object.
@@ -297,6 +316,30 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
     (just_categories.toSet, all_matches)
   }
 
+  /*
+   * This method categorizes the string and returns the categories as a JSON
+   * string.
+   *
+   * For example the categories Set(guncontrol, existenceofgod) would be returned
+   * as "{'guncontrol','existenceofgod'}". If there are no categories returned
+   * you get the string "{}"
+   *
+   * @param s The string to categorize
+   * @return a string containing a JSON representation of the categories.
+   */
+  def categorizeAndCountStringReturnString(s: String): String = {
+    val categories_and_counts = categorizeAndCountString(s)
+    val set_of_categories: Set[String] = categories_and_counts._1
+    val string_of_categories = {
+      if (set_of_categories.isEmpty) {
+        "{}"
+      } else {
+        s"{'${set_of_categories.mkString("','")}'}"
+      }
+    }
+    string_of_categories
+  }
+
   /* ciMatch
    * 
    * This is a psudo optimized implementation of a caseInsensitive matching algorithm
@@ -309,7 +352,8 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
    *          and the second being the number of secondary matches.
    */
   def ciMatch(src: String, what: LookupStruc): Map[String, (Int, Int)] = {
-    val length: Int = what.size
+    // the length of our source document in characters
+    val source_length = src.size
 
     // Build the structure that will hold our match counts. It is a mutable map with the topic specified by the string
     // and the number of core and secondary keywords matches are held in the (Int, Int) tuple, which is initialized
@@ -328,23 +372,73 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
     // keywords specified for each topic. Note that the algorithm is not tokenizing, it just steps through character
     // by character looking for substrings that match. So if a core or secondary keywords shows up in the middle of
     // another word it will still consider it match.
-    for (i <- 0 to src.size - length) {
+    for (i <- 0 until source_length) {
       val ch = src.charAt(i)
       if (what.contains(ch)) {
         // We have an initial match
+        // Now, iterate through each keyword that starts with ch
         what(ch).foreach(x => {
-          // Iterate through each keyword that starts with ch
-          if (src.regionMatches(true, i, x._1, 0, x._1.length)) {
-            // x._1 is our keyword, x._2 is our document category, x._3 is our keyword category
-            if (x._3 == "core") {
-              // If the keyword category is core, increment the first value in the category tuple
-              categories(x._2) = (categories(x._2)._1 + 1, categories(x._2)._2)
-            } else if (x._3 == "secondary") {
-              // If the keyword category is secondary, increment the secondary value in the category tuple
-              categories(x._2) = (categories(x._2)._1, categories(x._2)._2 + 1)
-            } else {
-              // We only support "core" and "secondary" keyword categories, don't know what to do with anything else
-              throw new RuntimeException(s"Unknown keyword category ${x._3}")
+          // This is the length of the string that we are searching for
+          val x_1_length = x._1.length
+
+          /*
+          if (require_token_separator) {
+            print(s"${x._1}: $source_length - $x_1_length = ${source_length - x_1_length}\n")
+            print(s"i = $i\n")
+            print(s"source_length - x_1_length) >= i: ${(source_length - x_1_length) >= i}\n")
+          }
+           */
+          if (((source_length - x_1_length) >= i) && src.regionMatches(true, i, x._1, 0, x_1_length)) {
+            // We have a match, but we are requiring that the match either begin or end
+            // with a space, i.e., it can't just be completely a subword match. This is important
+            // as it greatly reduces the number of matches for shorter common words like 'gun' for which
+            // you want to catch a word like 'shotgun' but not a word like 'segundo'.
+            var proceeding_character: String = {
+              if (i == 0) {
+                // first token in the document matches, what a coincidence
+                " "
+              } else {
+                // get the character right before our starting character
+                src.charAt(i - 1).toString
+              }
+            }
+            var following_character: String = {
+              if (i + x._1.length >= src.size) {
+                // match is at the end of the document, a rare occurrence
+                " "
+              } else {
+                // get the character right after our ending character
+                src.charAt(i + x._1.length).toString
+              }
+            }
+            /*
+            if (require_token_separator) {
+              print(s"Proceeding $proceeding_character, Following $following_character\n")
+              print(s"  Proceeding Matches: ${token_separator_pattern.pattern.matcher(proceeding_character).matches()}\n")
+              print(s"  Following Matches: ${token_separator_pattern.pattern.matcher(following_character).matches()}\n")
+            }
+             */
+            // Either the following or ending characters must be valid token separator
+            // as defined in the compiled regular expression pattern "token_separator_pattern"
+            if (!require_token_separator || (token_separator_pattern.pattern.matcher(following_character).matches() ||
+                 token_separator_pattern.pattern.matcher(proceeding_character).matches())) {
+              /*
+              if (require_token_separator) {
+                print(s"Looking for matches\n")
+              }
+               */
+
+              // x._1 is our keyword, x._2 is our document category, x._3 is our keyword category
+              if (x._3 == "core") {
+                // If the keyword category is core, increment the first value in the category tuple
+                categories(x._2) = (categories(x._2)._1 + 1, categories(x._2)._2)
+              } else if (x._3 == "secondary") {
+                // If the keyword category is secondary, increment the secondary value in the category tuple
+                categories(x._2) = (categories(x._2)._1, categories(x._2)._2 + 1)
+              } else {
+                // We only support "core" and "secondary" keyword categories, don't know what to do with anything else
+                throw new RuntimeException(s"Unknown keyword category ${x._3}")
+              }
             }
           }
         })

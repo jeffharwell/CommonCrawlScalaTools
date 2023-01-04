@@ -12,6 +12,14 @@ case class WARCCassandraBindWithCategories(warc_record_id:Option[String], catego
                                            warc_date:Option[String],
                                            wet_path:Option[String], warc_target_uri:Option[String],
                                            warc_tldn:Option[String])
+case class WARCCassandraBindWithCategoriesString(warc_record_id:Option[String], categories:Option[String],
+                                           content:Option[String], content_length:Option[String],
+                                           content_type:Option[String], lucene:Option[String],
+                                           warc_date:Option[String],
+                                           wet_path:Option[String], warc_target_uri:Option[String],
+                                           warc_tldn:Option[String])
+
+case class WARCIndexCassandraBindWithCategoriesString(warc_record_id:Option[String], categories:Option[String])
 
 /* I think this is legacy, use the above xxWithCategories bind class */
 case class WARCCassandraBind(warc_record_id:Option[String], content:Option[String], content_length:Option[String],

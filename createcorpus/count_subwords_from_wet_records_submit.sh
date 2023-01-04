@@ -12,19 +12,9 @@
 
 SPARK_HOME=${HOME}/bin/spark/spark-2.3.2-bin-hadoop2.7/
 SPARK_CLUSTER="spark://k8v17master.fuller.edu:6066"
-CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.parseWETFilesFromCommoncrawl"
+CLASS_TO_CALL="com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.getSubwordsFromWETRecords"
 VERSION=`cat ./build.sbt | grep ^version | awk '{print $3}' | sed 's/"//g'`
-#NUMBER_OF_WET_PATHS_TO_SELECT=7500 # takes about 53hr on 9 cores as 15 batches
-#NUMBER_OF_WET_PATHS_TO_SELECT=1500 # should take about 12hr on 9 cores as 3 batches
-NUMBER_OF_WET_PATHS_TO_SELECT=6000 # should take about 12hr on 9 cores as 3 batches
 
-
-###
-#
-# spark-submit will, by default, use the local path for the spark-assembly-1.6.3-hadoop2.6.0.jar, which
-# is not correct on the Spark cluster and will cause the job to fail with the error like the following
-#
-# Launch Command: "/usr/lib/jvm/java-8-openjdk-amd64/bin/java" "-cp" "/opt/spark/conf/:/home/jharwell/bin/spark/spark-1.6.3-bin-hadoop2.6//lib/spark-assembly-1.6.3-hadoop2.6.0.jar:/opt/spark/lib/datanucleus-core-3.2.10.jar:/opt/spark/lib/datanucleus-api-jdo-3.2.6.jar:/opt/spark/lib/datanucleus-rdbms-3.2.9.jar" "-Xms1024M" "-Xmx1024M" "-Dakka.loglevel=WARNING" "-Dspark.master=spark://k8master.fuller.edu:7077" "-Dspark.driver.supervise=false" "-Dspark.app.name=com.jeffharwell.commoncrawl.createcorpus.loadwetpaths" "-Dspark.submit.deployMode=cluster" "-Dspark.jars=http://nginx/lib/CreateCorpus-assembly-0.0.1.jar" "-Dspark.rpc.askTimeout=10" "org.apache.spark.deploy.worker.DriverWrapper" "spark://Worker@10.244.3.43:33412" "/opt/spark/work/driver-20180804153953-0009/CreateCorpus-assembly-0.0.1.jar" "com.jeffharwell.commoncrawl.createcorpus.loadwetpaths"
 # ========================================
 # 
 # Error: Could not find or load main class org.apache.spark.deploy.worker.DriverWrapper
@@ -53,5 +43,5 @@ $SPARK_HOME/bin/spark-submit \
     --class ${CLASS_TO_CALL} \
     --master ${SPARK_CLUSTER} \
     --executor-memory 2G \
-    --total-executor-cores 8\
-    http://nginx/CreateCorpus-assembly-${VERSION}.jar ${NUMBER_OF_WET_PATHS_TO_SELECT}
+    --total-executor-cores 5\
+    http://nginx/CreateCorpus-assembly-${VERSION}.jar gun guncontrol
