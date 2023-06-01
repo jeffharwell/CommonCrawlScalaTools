@@ -35,18 +35,48 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
   // Use this pattern to determine if a core or secondary keyword
   // is completely a subword or not
   val token_separator_pattern: Regex = raw"[\s\p{Punct}-]".r
-  var require_token_separator: Boolean = false
+  // By default we do not require the token separator to be a space or punctuation
+  // on either side of a match. But it can be set independently for the core or
+  // secondary search terms.
+  // 0 [=] don't require either to match
+  // 1 [=] require either the preceding or following character to match the token separator pattern
+  // 2 [=] require both the preceding and following character to match the token separator pattern
+  var require_token_separator: Map[String, Map[String, Int]] =
+          Map("abortion" -> Map("core" -> 0, "secondary" -> 0),
+            "evolution" -> Map("core" -> 0, "secondary" -> 0),
+            "existenceofgod" -> Map("core" -> 0, "secondary" -> 0),
+            "guncontrol" -> Map("core" -> 0, "secondary" -> 0)
+          )
+
+  // The core keywords that we are wanting to match in order to pass a document
+  // In general we have to not allow sub-word matches 'gun' because there are so
+  // many of them (think 'begun' or 'segundo'). So we don't allow sub-word matches
+  // but still want to catch the plural 'guns'.
+  val core_keywords = Map[String, List[String]](
+    "guncontrol" -> List("gun", "guns"),
+    "abortion" -> List("abortion"),
+    "evolution" -> List("evolution"),
+    "existenceofgod" -> List("god")
+  )
+
+  // The secondary keywords that we are wanting to match in order to pass a document
+  val secondary_keywords = Map[String, List[String]](
+    "guncontrol" -> List("strict", "control"),
+    "abortion" -> List("pro-life", "pro-choice"),
+    "evolution" -> List("natural", "mechanism", "intelligent", "design"),
+    "existenceofgod" -> List("atheist", "theist", "exist")
+  )
 
   // Changes the behavior of the matcher. By default it will not require a whitespace
   // or punctuation either before or after a matching string, but setting this to true
   // will make the class check to see
-  def setRequireTokenSeparator(value: Boolean): Unit = {
-    require_token_separator = value
+  def setRequireTokenSeparator(structure: Map[String, Map[String, Int]]): Unit = {
+    require_token_separator = structure
   }
 
   // True if the object is requiring that the proceeding or following character be either
   // punctuation or whitespace, false otherwise.
-  def getRequireTokenSeparator(): Boolean = {
+  def getRequireTokenSeparator(): Map[String, Map[String, Int]] = {
     require_token_separator
   }
 
@@ -192,20 +222,6 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
     )
   }
 
-  val core_keywords = Map[String, List[String]](
-    "guncontrol" -> List("gun"),
-    "abortion" -> List("abortion"),
-    "evolution" -> List("evolution"),
-    "existenceofgod" -> List("god")
-  )
-
-  val secondary_keywords = Map[String, List[String]](
-    "guncontrol" -> List("strict", "control"),
-    "abortion" -> List("pro-life", "pro-choice"),
-    "evolution" -> List("natural", "mechanism", "intelligent", "design"),
-    "existenceofgod" -> List("atheist", "theist", "exist")
-  )
-
   val lookup_structure: LookupStruc = create_lookup_structure(core_keywords, secondary_keywords)
   var criteria_structure: Map[String, Map[String, Int]] = create_criteria_structures(core_keywords, secondary_keywords)
 
@@ -280,7 +296,7 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
   }
 
   /*
-   * A more or less pure function, it takes as string as input and some matching 
+   * A more or less pure function, it takes as string as input and some matching
    * parameters as input and returns a list of categories that match
    *
    * @param s The string of content to categorize
@@ -340,10 +356,57 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
     string_of_categories
   }
 
+  /* tokenSeperatorRequirementMet
+   *
+   * Looks at the preceeding and following characters of the match and returns true if the policy specified in the
+   * 'require_token_seperator' structure is met. Otherwise it will return false.
+   *
+   * @param topic the topic name (i.e. 'abortion' or 'evolution')
+   * @param category the category of the match as a string (core or secondary)
+   * @param preceeding_character the character preceeding the match as a string
+   * @param following_character the character following the match as a string
+   * @returns boolean indicating if the characters preceeding and following the match met the requirement
+   */
+  def tokenSeperatorRequirementMet(topic: String, category: String, proceeding_character: String, following_character: String): Boolean = {
+    if (!require_token_separator.contains(topic)) {
+      // No policy is specified for this topic, default to no matches required
+      println(s"WARNING: no token separator requirement policy found for topic '$topic'")
+      true
+    } else {
+      if (!require_token_separator(topic).contains(category)) {
+        println(s"WARNING: no token separator requirement policy for for topic '$topic' category $category'")
+        true
+      } else if (require_token_separator(topic)(category) == 0) {
+        // Zero matches required for this category, so return true
+        true
+      } else if (require_token_separator(topic)(category) == 1) {
+        // We are only looking for one token separator for this category
+        if (token_separator_pattern.pattern.matcher(following_character).matches() ||
+          token_separator_pattern.pattern.matcher(proceeding_character).matches()) {
+          true
+        } else {
+          false
+        }
+      } else if (require_token_separator(topic)(category) == 2) {
+        // We are requiring both token separators for this category
+        if (token_separator_pattern.pattern.matcher(following_character).matches() &&
+          token_separator_pattern.pattern.matcher(proceeding_character).matches()) {
+          true
+        } else {
+          false
+        }
+      } else {
+        // 0, 1, and 2 are the only number of separator tokens that make sense to specify
+        // refuse to match anything.
+        false
+      }
+    }
+  }
+
   /* ciMatch
-   * 
+   *
    * This is a psudo optimized implementation of a caseInsensitive matching algorithm
-   * Converted from some plain old nasty Java derived from @icza 's answer to 
+   * Converted from some plain old nasty Java derived from @icza 's answer to
    * http://stackoverflow.com/questions/86780/how-to-check-if-a-string-contains-another-string-in-a-case-insensitive-manner-in
    *
    * @param src the string to search for a match
@@ -393,7 +456,7 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
             // with a space, i.e., it can't just be completely a subword match. This is important
             // as it greatly reduces the number of matches for shorter common words like 'gun' for which
             // you want to catch a word like 'shotgun' but not a word like 'segundo'.
-            var proceeding_character: String = {
+            var preceeding_character: String = {
               if (i == 0) {
                 // first token in the document matches, what a coincidence
                 " "
@@ -413,15 +476,15 @@ class FourForumsWARCTopicFilter() extends WARCTopicFilter {
             }
             /*
             if (require_token_separator) {
-              print(s"Proceeding $proceeding_character, Following $following_character\n")
-              print(s"  Proceeding Matches: ${token_separator_pattern.pattern.matcher(proceeding_character).matches()}\n")
+              print(s"Proceeding $preceeding_character, Following $following_character\n")
+              print(s"  Proceeding Matches: ${token_separator_pattern.pattern.matcher(preceeding_character).matches()}\n")
               print(s"  Following Matches: ${token_separator_pattern.pattern.matcher(following_character).matches()}\n")
             }
              */
             // Either the following or ending characters must be valid token separator
             // as defined in the compiled regular expression pattern "token_separator_pattern"
-            if (!require_token_separator || (token_separator_pattern.pattern.matcher(following_character).matches() ||
-                 token_separator_pattern.pattern.matcher(proceeding_character).matches())) {
+            // ._2 is the topic (i.e. 'abortion') and ._3 is the category (i.e. 'core')
+            if (tokenSeperatorRequirementMet(x._2, x._3, preceeding_character, following_character)) {
               /*
               if (require_token_separator) {
                 print(s"Looking for matches\n")

@@ -87,7 +87,16 @@ object generateClassifierStatisticsFromRandomWETPathsV2 {
     // output regardless of whether or not a document is classified.
     val ffc: FourForumsWARCTopicFilter = new FourForumsWARCTopicFilter()
     // Require that the keyword be either proceeded or followed by a space or punctuation mark
-    ffc.setRequireTokenSeparator(true)
+    // For all topics and types we are allowing a partial subword match (i.e. the word we are searching
+    // for appears at the beginning or end of a word) except for with gun control. For gun control we have
+    // two core words we are searching for (gun, and guns) and we require a non-subword match for at least
+    // one of them. Otherwise words like 'begun' create lots of false positives.
+    val separator_requirements = Map("abortion" -> Map("core" -> 1, "secondary" -> 1),
+                                     "evolution" -> Map("core" -> 1, "secondary" -> 1),
+                                     "existenceofgod" -> Map("core" -> 1, "secondary" -> 1),
+                                     "guncontrol" -> Map("core" -> 2, "secondary" -> 1)
+                                    )
+    ffc.setRequireTokenSeparator(separator_requirements)
 
     def categorizeAndBind(warc_record_id: String, document_content: String): List[ClassifiedWARCDocument] = {
       // Even if no documents get categorized the categorizer will spit out a data structure that contains the

@@ -207,4 +207,3 @@ class ProcessWETPaths(commoncrawl_url: String, spark_conf: SparkConf) extends ja
     lb.toList
   }
 }
-

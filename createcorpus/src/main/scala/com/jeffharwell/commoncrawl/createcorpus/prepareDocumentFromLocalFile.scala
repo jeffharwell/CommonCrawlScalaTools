@@ -1,5 +1,7 @@
 package com.jeffharwell.commoncrawl.createcorpus
 
+import com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.PrepareDocument
+
 import scala.io.Source
 
 object prepareDocumentFromLocalFile {

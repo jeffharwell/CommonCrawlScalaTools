@@ -12,7 +12,7 @@ import scala.collection.mutable.ListBuffer
  * and returns true if it matches false otherwise.
  *
  * During the initial run of the health and politics corpus create (referenced in dissertation,
- * Harwell, 2023) this class was cass MyWARCFilter.
+ * Harwell, 2023) this class was class MyWARCFilter.
  */
 class FourForumsWARCStreamFilter() extends WARCStreamFilter {
   /*

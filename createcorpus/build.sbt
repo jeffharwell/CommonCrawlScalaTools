@@ -7,7 +7,7 @@ organization := "com.jeffharwell"
 
 name := "CreateCorpus"
 
-version := "0.0.8"
+version := "0.0.9"
 publishMavenStyle := true
 
 //scalaVersion := "2.10.5"
@@ -27,10 +27,13 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "2.3.2" % "provided"
 libraryDependencies += "org.apache.spark" %% "spark-mllib" % "2.4.8" % "provided"
 
 // The WARCParser Library
-libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.37"
+libraryDependencies += "com.jeffharwell" %% "warcparser" % "0.0.38"
 libraryDependencies += "com.datastax.spark" %% "spark-cassandra-connector" % "2.3.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-parser" % "3.9.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.2"
+
+// Copying Data into MySql
+libraryDependencies += "mysql" % "mysql-connector-java" % "5.1.24"
 
 // For the test framework ScalaTest
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"

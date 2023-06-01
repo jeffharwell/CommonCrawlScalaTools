@@ -1,14 +1,14 @@
-package com.jeffharwell.commoncrawl.createcorpus
+package com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport
 
-import scala.collection.mutable.ListBuffer
+import edu.stanford.nlp.process.{CoreLabelTokenFactory, PTBTokenizer}
+
 import java.io.StringReader
-import java.util.regex.Pattern
-import java.security.MessageDigest
 import java.math.BigInteger
+import java.security.MessageDigest
+import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.collection.mutable
-import edu.stanford.nlp.process.PTBTokenizer
-import edu.stanford.nlp.process.CoreLabelTokenFactory
+import scala.collection.mutable.ListBuffer
 
 
 /*
@@ -705,4 +705,13 @@ class PrepareDocument(document: String) extends java.io.Serializable {
     }
     result_list.mkString("\n")
   }
+}
+
+/*
+ * Create a companion object so that we can instantiate the class without needing the 'new' keyword,
+ * this definitely cleans up so of the code used to prepare documents in Cassandra tables.
+ * i.e. val x = PrepareDocument(document_text).prepare() will work.
+ */
+object PrepareDocument {
+  def apply(x: String) = new PrepareDocument(x)
 }

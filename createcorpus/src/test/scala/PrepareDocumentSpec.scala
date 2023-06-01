@@ -1,4 +1,4 @@
-import com.jeffharwell.commoncrawl.createcorpus.PrepareDocument
+import com.jeffharwell.commoncrawl.createcorpus.commoncrawlimport.PrepareDocument
 import scala.collection.mutable.ListBuffer
 import org.scalatest._
 

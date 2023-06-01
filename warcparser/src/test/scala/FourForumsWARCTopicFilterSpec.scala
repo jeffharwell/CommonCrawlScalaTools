@@ -110,6 +110,8 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "not categorize this paragraph as existenceofgod with three core keyword and one secondary keyword" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 3, "secondary" -> 1))
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0),
+                                   "existenceofgod" -> Map("core" -> 0, "secondary" -> 0))) // don't require any separator tokens (allow subword matches)
     val w = create_warc_record(testcontext6)
     //assert(c.getCategories(testcontext6).isEmpty)
     assert(c.getCategories(w).isEmpty)
@@ -118,6 +120,8 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "not categorize this paragraph as existenceofgod with one core keyword and five secondary keyword" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 5))
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0),
+                                   "existenceofgod" -> Map("core" -> 0, "secondary" -> 0))) // don't require any separator tokens (allow subword matches)
     val w = create_warc_record(testcontext6)
     assert(c.getCategories(w).isEmpty)
   }
@@ -125,6 +129,8 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "count two core keyword and four secondary keyword in test string 6 for the existenceofgod category" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 10, "secondary" -> 10))
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0),
+                                   "existenceofgod" -> Map("core" -> 0, "secondary" -> 0))) // don't require any separator tokens (allow subword matches)
     val result_tuple = c.categorizeAndCountString(testcontext6)
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("existenceofgod")._1 == 2)
@@ -191,16 +197,32 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
 
   "FourForumsWARCTopicFilter" should "not match segundo to gun if RequireTokenSeparator is set" in {
     val c = new FourForumsWARCTopicFilter()
-    c.setRequireTokenSeparator(true)
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 2, "secondary" -> 1))) // don't allow any subword matches for core and only partial for secondary
     c.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 0))
     val w = create_warc_record(testcontext7)
+    assert(!c.hasCategories(w))
+  }
+
+  "FourForumsWARCTopicFilter" should "match begun to gun if RequireTokenSeparator is set to 1" in {
+    val c = new FourForumsWARCTopicFilter()
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 1, "secondary" -> 1))) // don't allow any subword matches for core and only partial for secondary
+    c.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 0))
+    val w = create_warc_record(testcontext17)
+    assert(c.hasCategories(w))
+  }
+
+  "FourForumsWARCTopicFilter" should "not match begun to gun if RequireTokenSeparator is set to 2" in {
+    val c = new FourForumsWARCTopicFilter()
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 2, "secondary" -> 1))) // don't allow any subword matches for core and only partial for secondary
+    c.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 0))
+    val w = create_warc_record(testcontext17)
     assert(!c.hasCategories(w))
   }
 
   "FourForumsWARCTopicFilter" should "count one core keyword in short sentence ending with the keyword as a subword without token separator required" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 10, "secondary" -> 10))
-    c.setRequireTokenSeparator(false)
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0))) // don't require any seperator tokens (allow subword matches)
     val result_tuple = c.categorizeAndCountString(testcontext13)
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("guncontrol")._1 == 1)
@@ -210,7 +232,7 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "count one core keyword in short sentence beginning with the keyword as a subword without token separator required" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 10, "secondary" -> 10))
-    c.setRequireTokenSeparator(false)
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0))) // don't require any seperator tokens (allow subword matches)
     val result_tuple = c.categorizeAndCountString(testcontext14)
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("guncontrol")._1 == 1)
@@ -220,7 +242,7 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "not count one core keyword in short sentence ending with the keyword as a subword with token separator required" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 10, "secondary" -> 10))
-    c.setRequireTokenSeparator(true)
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 2, "secondary" -> 1))) // don't allow any subword matches for core and only partial for secondary
     val result_tuple = c.categorizeAndCountString(testcontext13)
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("guncontrol")._1 == 0)
@@ -230,7 +252,7 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumsWARCTopicFilter" should "not count one core keyword in short sentence beginning with the keyword as a subword with token separator required" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("guncontrol", Map("core" -> 10, "secondary" -> 10))
-    c.setRequireTokenSeparator(true)
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 2, "secondary" -> 1))) // don't allow any subword matches for core and only partial for secondary
     val result_tuple = c.categorizeAndCountString(testcontext14)
     assert(result_tuple._1.isEmpty) // no category
     assert(result_tuple._2("guncontrol")._1 == 0)
@@ -251,6 +273,8 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 0))
     c.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 0))
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0),
+                                   "existenceofgod" -> Map("core" -> 0, "secondary" -> 0))) // don't require any separator tokens (allow subword matches)
     val categories_string = c.categorizeAndCountStringReturnString(testcontext15)
     val categories_list = get_list_of_categories(categories_string)
     assert(categories_list.contains("existenceofgod"))
@@ -261,6 +285,8 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   "FourForumnsWARCTopicFilter" should "return the string {} when there are no categories" in {
     val c = new FourForumsWARCTopicFilter()
     c.setMentions("existenceofgod", Map("core" -> 10, "secondary" -> 0))
+    c.setRequireTokenSeparator(Map("guncontrol" -> Map("core" -> 0, "secondary" -> 0),
+                                   "existenceofgod" -> Map("core" -> 0, "secondary" -> 0))) // don't require any separator tokens (allow subword matches)
     val categories_string = c.categorizeAndCountStringReturnString(testcontext14)
     assert(categories_string == "{}")
   }
@@ -348,5 +374,10 @@ class FourForumsWARCTopicFilterSpec extends FlatSpec {
   def testcontext15 =
     """
       |Sentence about guns and god.
+      |""".stripMargin
+
+  def testcontext17: String =
+    """
+      |We have yet begun to fight.
       |""".stripMargin
 }

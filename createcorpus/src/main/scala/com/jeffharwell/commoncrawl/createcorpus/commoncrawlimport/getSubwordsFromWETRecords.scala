@@ -10,11 +10,8 @@ import scala.collection.mutable
 import java.util.regex.{MatchResult, Matcher, Pattern}
 
 /*
- * This object appliest a newly configured topic filter to the records that are already in the
- * pilotparse.wetrecord table. After applying the new filter any remaining documents (i.e. records
- * that received a category under the criteria configured in the new TopicFilter) will be written
- * to the table pilotparse.wetrecord_refiltered. This process also creates a new index in
- * pilotparse.wetrecord_index_refiltered.
+ * The idea is to get a list of all the subwords that the filter finds. As of 2023.04.02 this object
+ * is still a work in progress.
  */
 
 object getSubwordsFromWETRecords {
@@ -114,7 +111,14 @@ object getSubwordsFromWETRecords {
     topic_filter.setMentions("evolution", Map("core" -> 1, "secondary" -> 2))
     topic_filter.setMentions("existenceofgod", Map("core" -> 1, "secondary" -> 1))
     topic_filter.setMentions("guncontrol", Map("core" -> 1, "secondary" -> 1))
-    topic_filter.setRequireTokenSeparator(true)
+
+    // Since we are on the hunt for subwords, we don't want to filter out any sub-words now do we.
+    val separator_requirements = Map("abortion" -> Map("core" -> 0, "secondary" -> 0),
+                                     "evolution" -> Map("core" -> 0, "secondary" -> 0),
+                                     "existenceofgod" -> Map("core" -> 0, "secondary" -> 0),
+                                     "guncontrol" -> Map("core" -> 0, "secondary" -> 0)
+                                    )
+    topic_filter.setRequireTokenSeparator(separator_requirements)
 
     def get_category_string(tf: FourForumsWARCTopicFilter, content: String): Option[String] = {
       /* Creates a new category string based on the content passed to it. If no categories are
