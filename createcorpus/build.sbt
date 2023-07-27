@@ -33,7 +33,8 @@ libraryDependencies += "edu.stanford.nlp" % "stanford-parser" % "3.9.2"
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.2"
 
 // Copying Data into MySql
-libraryDependencies += "mysql" % "mysql-connector-java" % "5.1.24"
+//libraryDependencies += "mysql" % "mysql-connector-java" % "5.1.24"
+libraryDependencies += "org.mariadb.jdbc" % "mariadb-java-client" % "3.1.4"
 
 // For the test framework ScalaTest
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.1" % "test"
